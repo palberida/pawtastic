@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Política de privacidad — ossu</title>
+    <title>Política de privacidad — Pawtastic</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -52,10 +52,10 @@
 <body>
     <div class="container">
         <h1>Política de privacidad</h1>
-        <p class="updated">Última actualización: 14 de mayo de 2026</p>
+        <p class="updated">Última actualización: 21 de mayo de 2026</p>
 
         <p>
-            En <strong>ossu</strong> (<a href="https://ossu.gt">ossu.gt</a>) respetamos tu privacidad
+            En <strong>Pawtastic</strong> (<a href="https://merida.com.gt/pawtastic">merida.com.gt/pawtastic</a>) respetamos tu privacidad
             y nos comprometemos a proteger los datos personales que compartes con nosotros. Esta
             política explica qué información recopilamos cuando interactúas con nuestra tienda, en
             particular a través de anuncios de Facebook/Instagram y mensajes de WhatsApp, cómo la
@@ -64,15 +64,15 @@
 
         <h2>1. Quiénes somos</h2>
         <p>
-            ossu es una tienda en línea con sede en Guatemala. Operamos el sitio web
-            <a href="https://ossu.gt">ossu.gt</a> y atendemos a clientes principalmente a través
+            Pawtastic es una tienda en línea con sede en Guatemala. Operamos el sitio web
+            <a href="https://merida.com.gt/pawtastic">merida.com.gt/pawtastic</a> y atendemos a clientes principalmente a través
             de WhatsApp y redes sociales (Facebook e Instagram). El responsable del tratamiento
-            de tus datos es ossu, contactable en
+            de tus datos es Pawtastic, contactable en
             <a href="mailto:ventas@ossu.gt">ventas@ossu.gt</a>.
         </p>
 
         <h2>2. Qué datos recopilamos</h2>
-        <p>Cuando interactúas con ossu por WhatsApp o haces clic en uno de nuestros anuncios, podemos recopilar:</p>
+        <p>Cuando interactúas con Pawtastic por WhatsApp o haces clic en uno de nuestros anuncios, podemos recopilar:</p>
         <ul>
             <li>Tu número de teléfono de WhatsApp.</li>
             <li>El nombre que tengas configurado en tu perfil de WhatsApp.</li>
@@ -95,7 +95,7 @@
         </ul>
         <p>
             No usamos tus mensajes de WhatsApp para fines distintos a la atención comercial
-            relacionada con ossu, y no enviamos publicidad masiva no solicitada por WhatsApp.
+            relacionada con Pawtastic, y no enviamos publicidad masiva no solicitada por WhatsApp.
         </p>
 
         <h2>4. Con quién compartimos tus datos</h2>
@@ -103,7 +103,7 @@
         <ul>
             <li><strong>Meta Platforms, Inc.</strong> — como proveedor de WhatsApp Business, Facebook e Instagram, a través de los cuales nos contactas. Meta aplica su propia política de privacidad.</li>
             <li><strong>Proveedores de logística y pagos</strong> — únicamente con la información estrictamente necesaria para entregar tu pedido o procesar tu pago.</li>
-            <li><strong>Personal autorizado de ossu</strong> — para atender tus consultas y gestionar tu compra.</li>
+            <li><strong>Personal autorizado de Pawtastic</strong> — para atender tus consultas y gestionar tu compra.</li>
         </ul>
         <p>No vendemos tus datos personales a terceros.</p>
 
@@ -146,8 +146,8 @@
 
         <h2>9. Contacto</h2>
         <div class="contact">
-            <strong>ossu</strong><br>
-            Sitio web: <a href="https://ossu.gt">ossu.gt</a><br>
+            <strong>Pawtastic</strong><br>
+            Sitio web: <a href="https://merida.com.gt/pawtastic">merida.com.gt/pawtastic</a><br>
             Correo: <a href="mailto:ventas@ossu.gt">ventas@ossu.gt</a>
         </div>
     </div>
