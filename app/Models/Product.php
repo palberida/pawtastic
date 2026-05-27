@@ -18,4 +18,9 @@ class Product extends Model
     {
         return $this->hasMany(Variant::class, 'id_producto');
     }
+
+    public function tags()
+    {
+        return $this->hasMany(ProductTag::class, 'id_producto');
+    }
 }

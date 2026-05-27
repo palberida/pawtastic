@@ -17,6 +17,8 @@ use App\Http\Controllers\BankAccountsController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Http\Controllers\MetabotAdController;
+use App\Http\Controllers\MetabotFaqController;
 
 /*
 |--------------------------------------------------------------------------
@@ -141,6 +143,21 @@ Route::middleware(['role:ceo,administrador,contador'])->group(function () {
     Route::get('/invoices-date', [AccountingController::class, 'invoices_date'])->name('accounting.invoices_date');
     Route::post('/invoices-date-save', [AccountingController::class, 'invoices_date_save'])->name('accounting.invoices_date_save');
 
+});
+
+// Metabot admin — configure which ads the bot engages and its FAQ answers.
+Route::middleware(['role:ceo,administrador'])->group(function () {
+    Route::get('/metabot/ads',           [MetabotAdController::class, 'index'])->name('metabot.ads.index');
+    Route::get('/metabot/ads/new',       [MetabotAdController::class, 'new'])->name('metabot.ads.new');
+    Route::post('/metabot/ads',          [MetabotAdController::class, 'store'])->name('metabot.ads.store');
+    Route::get('/metabot/ads/{id}/edit', [MetabotAdController::class, 'edit'])->name('metabot.ads.edit');
+    Route::post('/metabot/ads/{id}',     [MetabotAdController::class, 'update'])->name('metabot.ads.update');
+
+    Route::get('/metabot/faqs',           [MetabotFaqController::class, 'index'])->name('metabot.faqs.index');
+    Route::get('/metabot/faqs/new',       [MetabotFaqController::class, 'new'])->name('metabot.faqs.new');
+    Route::post('/metabot/faqs',          [MetabotFaqController::class, 'store'])->name('metabot.faqs.store');
+    Route::get('/metabot/faqs/{id}/edit', [MetabotFaqController::class, 'edit'])->name('metabot.faqs.edit');
+    Route::post('/metabot/faqs/{id}',     [MetabotFaqController::class, 'update'])->name('metabot.faqs.update');
 });
 
 // WhatsApp Cloud API webhook — intentionally outside every role middleware group.
