@@ -48,6 +48,18 @@ class MetabotInboxController extends Controller
         return view('metabot.inbox.show', compact('phone', 'messages', 'templates'));
     }
 
+    // Stream a stored media file inline (behind the inbox's role gate).
+    public function media($id)
+    {
+        $event = DB::table('metabot_events')->where('id', $id)->whereNotNull('media_path')->first();
+        abort_unless($event, 404);
+
+        $path = storage_path('app/' . $event->media_path);
+        abort_unless(is_file($path), 404);
+
+        return response()->file($path);
+    }
+
     // Polled by the thread view to pick up new customer messages without a reload.
     public function messages($phone)
     {
@@ -149,6 +161,9 @@ class MetabotInboxController extends Controller
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', $err);
         }
 
+        // Keep a local copy so the thread can show the thumbnail we sent.
+        $localPath = $whatsapp->putMedia(file_get_contents($file->getRealPath()), $file->getMimeType());
+
         $caption = $request->input('caption');
         $resp      = $whatsapp->sendImageById($phone, $mediaId, $caption);
         $messageId = data_get($resp, 'body.messages.0.id');
@@ -167,6 +182,7 @@ class MetabotInboxController extends Controller
             'to_phone'      => $phone,
             'kind'          => 'human_image',
             'body'          => '[imagen]' . ($caption ? ' ' . $caption : ''),
+            'media_path'    => $localPath,
             'payload'       => json_encode($resp, JSON_UNESCAPED_UNICODE),
             'created_at'    => now(),
             'updated_at'    => now(),

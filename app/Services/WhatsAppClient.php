@@ -3,9 +3,50 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class WhatsAppClient
 {
+    /**
+     * Resolve a Meta media id to a temporary download URL, fetch the bytes
+     * (the download also requires the bearer token), and store a copy under
+     * storage/app/metabot_media. Returns the relative storage path or null.
+     */
+    public function storeMedia(string $mediaId): ?string
+    {
+        $apiVersion = config('metabot.graph_api_version');
+        $token      = config('metabot.access_token');
+
+        $meta = Http::withToken($token)->acceptJson()
+            ->get("https://graph.facebook.com/{$apiVersion}/{$mediaId}");
+        $url  = data_get($meta->json(), 'url');
+        $mime = data_get($meta->json(), 'mime_type');
+        if (!$url) {
+            return null;
+        }
+
+        $bin = Http::withToken($token)->get($url);
+        if (!$bin->successful()) {
+            return null;
+        }
+
+        return $this->putMedia($bin->body(), $mime);
+    }
+
+    /**
+     * Persist raw image bytes to storage and return the relative path.
+     * Used for both inbound (downloaded) and outbound (staff upload) images.
+     */
+    public function putMedia(string $contents, ?string $mime): string
+    {
+        $ext  = $mime === 'image/png' ? 'png' : 'jpg';
+        $path = 'metabot_media/' . Str::random(40) . '.' . $ext;
+        Storage::disk('local')->put($path, $contents);
+
+        return $path;
+    }
+
     /**
      * Send an approved template message. The only message type allowed once the
      * 24h customer-service window has closed; billed by Meta per send. Fixed-text

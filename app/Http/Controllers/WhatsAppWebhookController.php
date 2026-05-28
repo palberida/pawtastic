@@ -99,6 +99,16 @@ class WhatsAppWebhookController extends Controller
             return;
         }
 
+        // Download inbound images so the inbox can show a thumbnail.
+        if ($type === 'image' && $waMessageId) {
+            $mediaId = data_get($message, 'image.id');
+            if ($mediaId && ($path = $whatsapp->storeMedia($mediaId))) {
+                DB::table('metabot_events')
+                    ->where('wa_message_id', $waMessageId)
+                    ->update(['media_path' => $path, 'updated_at' => now()]);
+            }
+        }
+
         if ($kind === 'ad_match' && $from !== null) {
             $response = $whatsapp->sendButtons(
                 $from,

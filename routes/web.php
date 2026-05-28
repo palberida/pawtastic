@@ -150,6 +150,7 @@ Route::middleware(['role:ceo,administrador,contador'])->group(function () {
 // Metabot inbox — staff read & reply to WhatsApp chats (sales reps included).
 Route::middleware(['role:ceo,administrador,vendedor'])->group(function () {
     Route::get('/metabot/inbox',                  [MetabotInboxController::class, 'index'])->name('metabot.inbox.index');
+    Route::get('/metabot/media/{id}',             [MetabotInboxController::class, 'media'])->name('metabot.media');
     Route::get('/metabot/inbox/{phone}',          [MetabotInboxController::class, 'show'])->name('metabot.inbox.show');
     Route::get('/metabot/inbox/{phone}/messages', [MetabotInboxController::class, 'messages'])->name('metabot.inbox.messages');
     Route::post('/metabot/inbox/{phone}/reply',    [MetabotInboxController::class, 'reply'])->name('metabot.inbox.reply');
