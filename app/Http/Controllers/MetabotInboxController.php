@@ -131,6 +131,55 @@ class MetabotInboxController extends Controller
             ->with('success', 'Plantilla enviada. Espera la respuesta del cliente para reabrir la ventana de 24h.');
     }
 
+    // Upload an image to Meta and send it to the customer (free-form: 24h window only).
+    public function sendImage(Request $request, WhatsAppClient $whatsapp, $phone)
+    {
+        $request->validate([
+            'image'   => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'caption' => ['nullable', 'string', 'max:1024'],
+        ]);
+
+        $file   = $request->file('image');
+        $upload = $whatsapp->uploadMedia($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName());
+        $mediaId = data_get($upload, 'body.id');
+
+        if ($upload['status'] !== 200 || !$mediaId) {
+            $err = data_get($upload, 'body.error.message', 'No se pudo subir la imagen.');
+
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', $err);
+        }
+
+        $caption = $request->input('caption');
+        $resp      = $whatsapp->sendImageById($phone, $mediaId, $caption);
+        $messageId = data_get($resp, 'body.messages.0.id');
+        $ok        = $resp['status'] === 200 && $messageId;
+
+        if (!$ok) {
+            $err = data_get($resp, 'body.error.message', 'No se pudo enviar la imagen (posible ventana de 24h vencida).');
+
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', $err);
+        }
+
+        DB::table('metabot_events')->insert([
+            'wa_message_id' => $messageId,
+            'direction'     => 'out',
+            'from_phone'    => null,
+            'to_phone'      => $phone,
+            'kind'          => 'human_image',
+            'body'          => '[imagen]' . ($caption ? ' ' . $caption : ''),
+            'payload'       => json_encode($resp, JSON_UNESCAPED_UNICODE),
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->status = 'handed_off';
+        $conv->last_message_at = now();
+        $conv->save();
+
+        return redirect()->route('metabot.inbox.show', ['phone' => $phone]);
+    }
+
     private function threadFor($phone)
     {
         return DB::table('metabot_events')
