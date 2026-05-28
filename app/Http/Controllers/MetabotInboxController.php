@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MetabotConversation;
+use App\Models\MetabotTemplate;
 use App\Services\WhatsAppClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +42,10 @@ class MetabotInboxController extends Controller
 
     public function show($phone)
     {
-        $messages = $this->threadFor($phone);
+        $messages  = $this->threadFor($phone);
+        $templates = MetabotTemplate::where('status', 'active')->orderBy('label')->orderBy('name')->get();
 
-        return view('metabot.inbox.show', compact('phone', 'messages'));
+        return view('metabot.inbox.show', compact('phone', 'messages', 'templates'));
     }
 
     // Polled by the thread view to pick up new customer messages without a reload.
@@ -90,6 +92,43 @@ class MetabotInboxController extends Controller
         $conv->save();
 
         return redirect()->route('metabot.inbox.show', ['phone' => $phone]);
+    }
+
+    // Send an approved template — the only way to reopen a chat past the 24h window.
+    public function sendTemplate(Request $request, WhatsAppClient $whatsapp, $phone)
+    {
+        $request->validate(['template_id' => ['required', 'integer']]);
+        $template = MetabotTemplate::where('status', 'active')->findOrFail($request->input('template_id'));
+
+        $resp      = $whatsapp->sendTemplate($phone, $template->name, $template->language);
+        $messageId = data_get($resp, 'body.messages.0.id');
+        $ok        = $resp['status'] === 200 && $messageId;
+
+        if (!$ok) {
+            $err = data_get($resp, 'body.error.message', 'No se pudo enviar la plantilla.');
+
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', $err);
+        }
+
+        DB::table('metabot_events')->insert([
+            'wa_message_id' => $messageId,
+            'direction'     => 'out',
+            'from_phone'    => null,
+            'to_phone'      => $phone,
+            'kind'          => 'template',
+            'body'          => $template->body_preview ?: ('[plantilla: ' . $template->name . ']'),
+            'payload'       => json_encode($resp, JSON_UNESCAPED_UNICODE),
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->status = 'handed_off';
+        $conv->last_message_at = now();
+        $conv->save();
+
+        return redirect()->route('metabot.inbox.show', ['phone' => $phone])
+            ->with('success', 'Plantilla enviada. Espera la respuesta del cliente para reabrir la ventana de 24h.');
     }
 
     private function threadFor($phone)

@@ -6,6 +6,40 @@ use Illuminate\Support\Facades\Http;
 
 class WhatsAppClient
 {
+    /**
+     * Send an approved template message. The only message type allowed once the
+     * 24h customer-service window has closed; billed by Meta per send. Fixed-text
+     * templates need no components.
+     */
+    public function sendTemplate(string $toPhone, string $name, string $language): array
+    {
+        $apiVersion    = config('metabot.graph_api_version');
+        $phoneNumberId = config('metabot.phone_number_id');
+        $token         = config('metabot.access_token');
+
+        $url = "https://graph.facebook.com/{$apiVersion}/{$phoneNumberId}/messages";
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type'    => 'individual',
+            'to'                => $toPhone,
+            'type'              => 'template',
+            'template'          => [
+                'name'     => $name,
+                'language' => ['code' => $language],
+            ],
+        ];
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->post($url, $payload);
+
+        return [
+            'status' => $response->status(),
+            'body'   => $response->json() ?? $response->body(),
+        ];
+    }
+
     public function sendText(string $toPhone, string $text): array
     {
         $apiVersion    = config('metabot.graph_api_version');

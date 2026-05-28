@@ -28,6 +28,25 @@
                             <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
                         </div>
                     </form>
+
+                    @if($templates->isNotEmpty())
+                        <div class="mt-6 pt-4 border-t border-gray-200">
+                            <label for="template_id" class="block text-sm font-medium text-gray-700">Reabrir conversación con una plantilla</label>
+                            <p class="text-xs text-gray-400 mb-2">Úsala cuando ya pasaron 24h del último mensaje del cliente. Cada envío tiene costo (mensaje de plantilla de Meta).</p>
+                            <form method="POST" action="{{ route('metabot.inbox.template', ['phone' => $phone]) }}" onsubmit="return confirm('Se enviará una plantilla pagada para reabrir la conversación. ¿Continuar?');">
+                                @csrf
+                                <select name="template_id" id="template_id" required class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    @foreach($templates as $t)
+                                        <option value="{{ $t->id }}" data-body="{{ $t->body_preview }}">{{ $t->label ?: $t->name }}</option>
+                                    @endforeach
+                                </select>
+                                <p id="template_preview" class="text-sm text-gray-600 mt-2 italic"></p>
+                                <div class="mt-2 text-right">
+                                    <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 transition">Enviar plantilla</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -46,6 +65,17 @@
         }
         scrollBottom();
         setInterval(poll, 7000);
+
+        var sel = document.getElementById('template_id');
+        var prev = document.getElementById('template_preview');
+        if (sel && prev) {
+            function showPreview() {
+                var opt = sel.options[sel.selectedIndex];
+                prev.textContent = opt ? (opt.getAttribute('data-body') || '') : '';
+            }
+            sel.addEventListener('change', showPreview);
+            showPreview();
+        }
     })();
     </script>
 </x-app-layout>

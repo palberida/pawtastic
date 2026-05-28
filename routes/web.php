@@ -20,6 +20,7 @@ use App\Http\Controllers\WhatsAppWebhookController;
 use App\Http\Controllers\MetabotAdController;
 use App\Http\Controllers\MetabotFaqController;
 use App\Http\Controllers\MetabotInboxController;
+use App\Http\Controllers\MetabotTemplateController;
 
 /*
 |--------------------------------------------------------------------------
@@ -151,7 +152,8 @@ Route::middleware(['role:ceo,administrador,vendedor'])->group(function () {
     Route::get('/metabot/inbox',                  [MetabotInboxController::class, 'index'])->name('metabot.inbox.index');
     Route::get('/metabot/inbox/{phone}',          [MetabotInboxController::class, 'show'])->name('metabot.inbox.show');
     Route::get('/metabot/inbox/{phone}/messages', [MetabotInboxController::class, 'messages'])->name('metabot.inbox.messages');
-    Route::post('/metabot/inbox/{phone}/reply',   [MetabotInboxController::class, 'reply'])->name('metabot.inbox.reply');
+    Route::post('/metabot/inbox/{phone}/reply',    [MetabotInboxController::class, 'reply'])->name('metabot.inbox.reply');
+    Route::post('/metabot/inbox/{phone}/template', [MetabotInboxController::class, 'sendTemplate'])->name('metabot.inbox.template');
 });
 
 // Metabot admin — configure which ads the bot engages and its FAQ answers.
@@ -167,6 +169,12 @@ Route::middleware(['role:ceo,administrador'])->group(function () {
     Route::post('/metabot/faqs',          [MetabotFaqController::class, 'store'])->name('metabot.faqs.store');
     Route::get('/metabot/faqs/{id}/edit', [MetabotFaqController::class, 'edit'])->name('metabot.faqs.edit');
     Route::post('/metabot/faqs/{id}',     [MetabotFaqController::class, 'update'])->name('metabot.faqs.update');
+
+    Route::get('/metabot/templates',           [MetabotTemplateController::class, 'index'])->name('metabot.templates.index');
+    Route::get('/metabot/templates/new',       [MetabotTemplateController::class, 'new'])->name('metabot.templates.new');
+    Route::post('/metabot/templates',          [MetabotTemplateController::class, 'store'])->name('metabot.templates.store');
+    Route::get('/metabot/templates/{id}/edit', [MetabotTemplateController::class, 'edit'])->name('metabot.templates.edit');
+    Route::post('/metabot/templates/{id}',     [MetabotTemplateController::class, 'update'])->name('metabot.templates.update');
 });
 
 // WhatsApp Cloud API webhook — intentionally outside every role middleware group.
