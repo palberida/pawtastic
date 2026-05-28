@@ -19,6 +19,7 @@ use App\Http\Controllers\TaxController;
 use App\Http\Controllers\WhatsAppWebhookController;
 use App\Http\Controllers\MetabotAdController;
 use App\Http\Controllers\MetabotFaqController;
+use App\Http\Controllers\MetabotInboxController;
 
 /*
 |--------------------------------------------------------------------------
@@ -143,6 +144,14 @@ Route::middleware(['role:ceo,administrador,contador'])->group(function () {
     Route::get('/invoices-date', [AccountingController::class, 'invoices_date'])->name('accounting.invoices_date');
     Route::post('/invoices-date-save', [AccountingController::class, 'invoices_date_save'])->name('accounting.invoices_date_save');
 
+});
+
+// Metabot inbox — staff read & reply to WhatsApp chats (sales reps included).
+Route::middleware(['role:ceo,administrador,vendedor'])->group(function () {
+    Route::get('/metabot/inbox',                  [MetabotInboxController::class, 'index'])->name('metabot.inbox.index');
+    Route::get('/metabot/inbox/{phone}',          [MetabotInboxController::class, 'show'])->name('metabot.inbox.show');
+    Route::get('/metabot/inbox/{phone}/messages', [MetabotInboxController::class, 'messages'])->name('metabot.inbox.messages');
+    Route::post('/metabot/inbox/{phone}/reply',   [MetabotInboxController::class, 'reply'])->name('metabot.inbox.reply');
 });
 
 // Metabot admin — configure which ads the bot engages and its FAQ answers.

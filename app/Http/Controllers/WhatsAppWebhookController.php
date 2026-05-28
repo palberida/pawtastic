@@ -88,6 +88,7 @@ class WhatsAppWebhookController extends Controller
             'source_id'     => $referralSourceId,
             'button_id'     => $buttonId,
             'button_title'  => $buttonTitle,
+            'body'          => $this->extractBody($message),
             'payload'       => json_encode($message, JSON_UNESCAPED_UNICODE),
             'created_at'    => now(),
             'updated_at'    => now(),
@@ -112,10 +113,43 @@ class WhatsAppWebhookController extends Controller
                 'to_phone'      => $from,
                 'kind'          => 'sent_buttons',
                 'source_id'     => $referralSourceId,
+                'body'          => config('metabot.buttons_body'),
                 'payload'       => json_encode($response, JSON_UNESCAPED_UNICODE),
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ]);
+        }
+    }
+
+    // Human-readable text for the inbox thread, by WhatsApp message type.
+    private function extractBody(array $message): ?string
+    {
+        $type = $message['type'] ?? null;
+
+        switch ($type) {
+            case 'text':
+                return data_get($message, 'text.body');
+            case 'interactive':
+                return data_get($message, 'interactive.button_reply.title')
+                    ?? data_get($message, 'interactive.list_reply.title');
+            case 'button':
+                return data_get($message, 'button.text');
+            case 'image':
+                $caption = data_get($message, 'image.caption');
+                return '[imagen]' . ($caption ? ' ' . $caption : '');
+            case 'audio':
+            case 'voice':
+                return '[nota de voz]';
+            case 'video':
+                return '[video]';
+            case 'document':
+                return '[documento]';
+            case 'sticker':
+                return '[sticker]';
+            case 'location':
+                return '[ubicación]';
+            default:
+                return $type ? '[' . $type . ']' : null;
         }
     }
 }
