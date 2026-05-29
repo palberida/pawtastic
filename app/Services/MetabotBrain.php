@@ -185,7 +185,7 @@ class MetabotBrain
      * Build the Anthropic message list from the stored event transcript.
      * Inbound → user, outbound → assistant. Consecutive same-role turns are merged,
      * leading assistant turns dropped, and a synthetic opener appended if the last
-     * turn isn't the customer's (e.g. the <from_ad> simulator cue, which is skipped).
+     * turn isn't the customer's (e.g. a bare simulator trigger with no real text).
      *
      * @return array<array{role:string,text:string,content:string}>
      */
@@ -203,7 +203,7 @@ class MetabotBrain
         $turns = [];
         foreach ($events as $e) {
             $text = trim((string) ($e->body ?? ''));
-            if ($text === '' || $text === '<from_ad>') {
+            if ($text === '') {
                 continue;
             }
             $role = $e->direction === 'in' ? 'user' : 'assistant';

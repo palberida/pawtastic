@@ -37,10 +37,13 @@ return [
     // tool call is logged, but NOTHING is sent to the customer. Flip to false to go live.
     'shadow_mode' => filter_var(env('METABOT_SHADOW_MODE', true), FILTER_VALIDATE_BOOLEAN),
 
-    // Gated <from_ad> simulator: lets the owner pretend a message arrived from the ad,
-    // for testing the bot without an actual ad click. NOT a public backdoor — it only
-    // fires when enabled AND the sender matches the configured phone.
+    // Gated simulator: lets the owner pretend a message arrived from the ad, for
+    // testing the bot without an actual ad click. Prefix a normal text with the
+    // trigger word (e.g. "adtest hola, ¿precio?") and the bot treats it as coming
+    // from simulator_source_id, answering the message minus the prefix. NOT a public
+    // backdoor — it only fires when enabled AND the sender matches the configured phone.
     'simulator_enabled'   => filter_var(env('METABOT_SIMULATOR_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     'simulator_phone'     => env('METABOT_SIMULATOR_PHONE'),
     'simulator_source_id' => env('METABOT_SIMULATOR_SOURCE_ID', env('METABOT_TARGET_AD_ID')),
+    'simulator_prefix'    => env('METABOT_SIMULATOR_PREFIX', 'adtest'),
 ];

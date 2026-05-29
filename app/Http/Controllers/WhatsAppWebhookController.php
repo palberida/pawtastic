@@ -63,6 +63,15 @@ class WhatsAppWebhookController extends Controller
         $referralSourceId = data_get($message, 'referral.source_id');
         $targetAdId       = config('metabot.target_ad_id');
 
+        // Gated simulator: the owner can prefix a normal text with the trigger word
+        // (config simulator_prefix, default "adtest") to fake an arrival from our ad
+        // while carrying real text. We strip the prefix so the stored transcript — and
+        // therefore what Claude reads — is the clean message. Only the configured phone.
+        if ($this->isSimulatorMessage($from, $type, $message)) {
+            $message['text']['body'] = $this->stripSimPrefix(data_get($message, 'text.body'));
+            $referralSourceId        = config('metabot.simulator_source_id');
+        }
+
         $isButtonReply = $type === 'interactive'
             && data_get($message, 'interactive.type') === 'button_reply';
         $isAdMatch = $referralSourceId !== null
@@ -132,16 +141,6 @@ class WhatsAppWebhookController extends Controller
             return;
         }
 
-        // Gated <from_ad> simulator: lets the owner test the bot without a real ad click.
-        // Fires ONLY when enabled AND the sender is the configured simulator phone.
-        $body = $type === 'text' ? trim((string) data_get($message, 'text.body')) : null;
-        if ($body === '<from_ad>'
-            && config('metabot.simulator_enabled')
-            && config('metabot.simulator_phone')
-            && $from === config('metabot.simulator_phone')) {
-            $referralSourceId = config('metabot.simulator_source_id');
-        }
-
         $ad = $referralSourceId
             ? MetabotAd::where('source_id', $referralSourceId)->where('status', 'active')->first()
             : null;
@@ -166,6 +165,37 @@ class WhatsAppWebhookController extends Controller
         }
 
         app(MetabotBrain::class)->handle($conv, $whatsapp);
+    }
+
+    /**
+     * Is this a gated simulator message? Only a text from the configured phone,
+     * while the simulator is enabled, whose body begins with the trigger word.
+     */
+    private function isSimulatorMessage(?string $from, ?string $type, array $message): bool
+    {
+        if (!config('metabot.simulator_enabled') || $type !== 'text' || $from === null) {
+            return false;
+        }
+        if (!config('metabot.simulator_phone') || $from !== config('metabot.simulator_phone')) {
+            return false;
+        }
+
+        $prefix = config('metabot.simulator_prefix', 'adtest');
+        $body   = ltrim((string) data_get($message, 'text.body'));
+
+        return $prefix !== '' && (bool) preg_match('/^' . preg_quote($prefix, '/') . '\b/iu', $body);
+    }
+
+    // Remove the simulator trigger word (and following whitespace) from the body.
+    private function stripSimPrefix(?string $text): string
+    {
+        $prefix = config('metabot.simulator_prefix', 'adtest');
+
+        return ltrim(preg_replace(
+            '/^\s*' . preg_quote($prefix, '/') . '\b\s*/iu',
+            '',
+            (string) $text
+        ));
     }
 
     // Human-readable text for the inbox thread, by WhatsApp message type.
