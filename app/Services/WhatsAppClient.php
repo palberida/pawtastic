@@ -163,6 +163,94 @@ class WhatsAppClient
         ];
     }
 
+    /**
+     * Send an interactive list message (picker). Up to 10 rows in a single section.
+     * Titles are capped at 24 chars and descriptions at 72 by the API, so we truncate.
+     *
+     * @param  array<array{id:string,title:string,description?:string}>  $rows
+     */
+    public function sendList(string $toPhone, string $body, string $button, array $rows): array
+    {
+        $apiVersion    = config('metabot.graph_api_version');
+        $phoneNumberId = config('metabot.phone_number_id');
+        $token         = config('metabot.access_token');
+
+        $url = "https://graph.facebook.com/{$apiVersion}/{$phoneNumberId}/messages";
+
+        $listRows = array_map(function ($r) {
+            $row = [
+                'id'    => mb_substr((string) ($r['id'] ?? ''), 0, 200),
+                'title' => mb_substr((string) ($r['title'] ?? ''), 0, 24),
+            ];
+            if (!empty($r['description'])) {
+                $row['description'] = mb_substr((string) $r['description'], 0, 72);
+            }
+
+            return $row;
+        }, array_slice($rows, 0, 10));
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type'    => 'individual',
+            'to'                => $toPhone,
+            'type'              => 'interactive',
+            'interactive'       => [
+                'type'   => 'list',
+                'body'   => ['text' => mb_substr($body, 0, 1024)],
+                'action' => [
+                    'button'   => mb_substr($button ?: 'Ver opciones', 0, 20),
+                    'sections' => [
+                        ['rows' => $listRows],
+                    ],
+                ],
+            ],
+        ];
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->post($url, $payload);
+
+        return [
+            'status' => $response->status(),
+            'body'   => $response->json() ?? $response->body(),
+        ];
+    }
+
+    /**
+     * Send an image by public URL (used for catalog photos, which already live on
+     * an HTTPS CDN — no upload step needed, unlike staff-uploaded images).
+     */
+    public function sendImageByUrl(string $toPhone, string $url, ?string $caption = null): array
+    {
+        $apiVersion    = config('metabot.graph_api_version');
+        $phoneNumberId = config('metabot.phone_number_id');
+        $token         = config('metabot.access_token');
+
+        $endpoint = "https://graph.facebook.com/{$apiVersion}/{$phoneNumberId}/messages";
+
+        $image = ['link' => $url];
+        if ($caption !== null && $caption !== '') {
+            $image['caption'] = $caption;
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type'    => 'individual',
+            'to'                => $toPhone,
+            'type'              => 'image',
+            'image'             => $image,
+        ];
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->post($endpoint, $payload);
+
+        return [
+            'status' => $response->status(),
+            'body'   => $response->json() ?? $response->body(),
+        ];
+    }
+
     public function sendButtons(string $toPhone, string $body, array $buttons): array
     {
         $apiVersion    = config('metabot.graph_api_version');

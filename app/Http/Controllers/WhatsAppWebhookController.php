@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MetabotAd;
+use App\Models\MetabotConversation;
+use App\Services\MetabotBrain;
 use App\Services\WhatsAppClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,26 +112,60 @@ class WhatsAppWebhookController extends Controller
             }
         }
 
-        if ($kind === 'ad_match' && $from !== null) {
-            $response = $whatsapp->sendButtons(
-                $from,
-                config('metabot.buttons_body'),
-                config('metabot.buttons')
-            );
+        // Phase 2: hand the message to the conversational bot (ad-originated only).
+        $this->routeBot($message, $type, $from, $referralSourceId, $whatsapp);
+    }
 
-            DB::table('metabot_events')->insert([
-                'wa_message_id' => null,
-                'direction'     => 'out',
-                'from_phone'    => null,
-                'to_phone'      => $from,
-                'kind'          => 'sent_buttons',
-                'source_id'     => $referralSourceId,
-                'body'          => config('metabot.buttons_body'),
-                'payload'       => json_encode($response, JSON_UNESCAPED_UNICODE),
-                'created_at'    => now(),
-                'updated_at'    => now(),
-            ]);
+    /**
+     * Decide whether the conversational bot owns this message and, if so, run it.
+     *
+     * The bot engages only on ad-originated conversations: an inbound carrying a
+     * referral whose source_id matches an active metabot_ads row, plus the
+     * follow-ups of an already-active conversation. Everything else is left to
+     * humans (no reply, no email).
+     *
+     * Newest referral wins — a later ad click re-points (and re-wakes) the convo.
+     */
+    private function routeBot(array $message, ?string $type, ?string $from, ?string $referralSourceId, WhatsAppClient $whatsapp): void
+    {
+        if ($from === null) {
+            return;
         }
+
+        // Gated <from_ad> simulator: lets the owner test the bot without a real ad click.
+        // Fires ONLY when enabled AND the sender is the configured simulator phone.
+        $body = $type === 'text' ? trim((string) data_get($message, 'text.body')) : null;
+        if ($body === '<from_ad>'
+            && config('metabot.simulator_enabled')
+            && config('metabot.simulator_phone')
+            && $from === config('metabot.simulator_phone')) {
+            $referralSourceId = config('metabot.simulator_source_id');
+        }
+
+        $ad = $referralSourceId
+            ? MetabotAd::where('source_id', $referralSourceId)->where('status', 'active')->first()
+            : null;
+
+        $conv = MetabotConversation::where('phone', $from)->first();
+
+        if ($ad) {
+            // Engage or re-wake. A handed_off conversation returns to active here.
+            $conv = MetabotConversation::firstOrNew(['phone' => $from]);
+            $conv->current_ad_id     = $ad->id;
+            $conv->current_source_id = $ad->source_id;
+            $conv->status            = 'active';
+            $conv->last_message_at   = now();
+            $conv->save();
+        } else {
+            // No ad on this message — only continue if the bot already owns it.
+            if (!$conv || $conv->status !== 'active' || !$conv->current_ad_id) {
+                return;
+            }
+            $conv->last_message_at = now();
+            $conv->save();
+        }
+
+        app(MetabotBrain::class)->handle($conv, $whatsapp);
     }
 
     // Human-readable text for the inbox thread, by WhatsApp message type.
