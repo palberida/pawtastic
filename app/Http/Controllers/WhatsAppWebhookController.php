@@ -68,10 +68,16 @@ class WhatsAppWebhookController extends Controller
             return;
         }
 
-        DB::table('metabot_contacts')->updateOrInsert(
-            ['phone' => $phone],
-            ['name' => mb_substr((string) $name, 0, 255), 'updated_at' => now()]
-        );
+        // Never let a name-capture failure (e.g. the table not applied yet) break the
+        // webhook and stop the bot from replying — it's a non-critical nicety.
+        try {
+            DB::table('metabot_contacts')->updateOrInsert(
+                ['phone' => $phone],
+                ['name' => mb_substr((string) $name, 0, 255), 'updated_at' => now()]
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('metabot: rememberContact failed', ['error' => $e->getMessage()]);
+        }
     }
 
     private function processMessage(array $message, WhatsAppClient $whatsapp): void
