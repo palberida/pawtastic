@@ -56,6 +56,32 @@ class MetabotCatalog
     }
 
     /**
+     * The whole catalog, hydrated and grouped by the product-level `categoria`
+     * tag (untagged products fall under "Otros"). Used by the inbox quick-reply
+     * console. Small-shop sized; products() caps the set at 200.
+     *
+     * @return array<array{categoria:string, products:array}>
+     */
+    public function everything(): array
+    {
+        $ids = $this->db()->table('products')->orderBy('descripcion')->pluck('id')->all();
+
+        $groups = [];
+        foreach ($this->products($ids) as $p) {
+            $cat = $p['categoria'] !== null && $p['categoria'] !== '' ? $p['categoria'] : 'Otros';
+            $groups[$cat][] = $p;
+        }
+        ksort($groups);
+
+        $out = [];
+        foreach ($groups as $cat => $prods) {
+            $out[] = ['categoria' => $cat, 'products' => $prods];
+        }
+
+        return $out;
+    }
+
+    /**
      * Hydrate a set of products with their variants, tags, prices and photos.
      *
      * @param  array<int>  $productIds

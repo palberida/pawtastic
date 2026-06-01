@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\MetabotConversation;
 use App\Models\MetabotTemplate;
+use App\Services\MetabotCatalog;
 use App\Services\WhatsAppClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class MetabotInboxController extends Controller
 {
@@ -78,8 +81,201 @@ class MetabotInboxController extends Controller
         $messages  = $this->threadFor($phone);
         $templates = MetabotTemplate::where('status', 'active')->orderBy('label')->orderBy('name')->get();
         $name      = DB::table('metabot_contacts')->where('phone', $phone)->value('name');
+        $quickMenu = $this->buildQuickMenu();
 
-        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name'));
+        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu'));
+    }
+
+    /**
+     * Catalog drill-down for the quick-reply console: categories → products →
+     * precomposed Price / Measurements text + photo URLs. Built read-only from
+     * the catalog; a failure (e.g. RO user not provisioned) degrades to an empty
+     * menu instead of breaking the chat page.
+     *
+     * @return array
+     */
+    private function buildQuickMenu(): array
+    {
+        try {
+            $catalog = app(MetabotCatalog::class)->everything();
+        } catch (\Throwable $e) {
+            Log::warning('metabot: buildQuickMenu failed', ['error' => $e->getMessage()]);
+            return [];
+        }
+
+        $menu = [];
+        foreach ($catalog as $group) {
+            $products = [];
+            foreach ($group['products'] as $p) {
+                $price    = $this->composePrice($p);
+                $measures = $this->composeMeasures($p);
+                $images   = $this->imagesFor($p);
+
+                $products[] = [
+                    'id'            => $p['id'],
+                    'nombre'        => $p['nombre'],
+                    'price_text'    => $price,
+                    'measures_text' => $measures,
+                    'images'        => $images,
+                    'has_price'     => $price !== null,
+                    'has_measures'  => $measures !== null,
+                    'has_photos'    => !empty($images),
+                ];
+            }
+            $menu[] = ['categoria' => $group['categoria'], 'products' => $products];
+        }
+
+        return $menu;
+    }
+
+    private function composePrice(array $p): ?string
+    {
+        if ($p['precio_min'] === null) {
+            return null;
+        }
+        $line = $p['precio_min'] == $p['precio_max']
+            ? "💰 {$p['nombre']}: Q" . $this->money($p['precio_min'])
+            : "💰 {$p['nombre']}: desde Q" . $this->money($p['precio_min']) . ' hasta Q' . $this->money($p['precio_max']);
+
+        if (!empty($p['agotado_todo'])) {
+            $line .= ' (agotado)';
+        }
+
+        return $line;
+    }
+
+    private function composeMeasures(array $p): ?string
+    {
+        $exclude = ['color', 'info']; // descriptive, not measurements
+        $lines   = [];
+
+        if (!empty($p['pivot'])) {
+            $seen = [];
+            foreach ($p['variants'] as $v) {
+                $pv = $v['pivot_valor'];
+                if ($pv === null || isset($seen[$pv])) {
+                    continue;
+                }
+                $seen[$pv] = true;
+
+                $measures = [];
+                foreach ($v['tags'] as $tag => $val) {
+                    if (!in_array($tag, $exclude, true)) {
+                        $measures[] = "{$tag}: {$val}";
+                    }
+                }
+                $label   = ucfirst($p['pivot']) . " {$pv}";
+                $lines[] = $measures ? "• {$label} — " . implode(', ', $measures) : "• {$label}";
+            }
+        } else {
+            $tags = $p['tags'];
+            if (empty($tags) && !empty($p['variants'])) {
+                $tags = $p['variants'][0]['tags'];
+            }
+            foreach ($tags as $tag => $val) {
+                if (!in_array($tag, $exclude, true)) {
+                    $lines[] = "• {$tag}: {$val}";
+                }
+            }
+        }
+
+        if (empty($lines)) {
+            return null;
+        }
+
+        return "📏 Medidas de {$p['nombre']}:\n" . implode("\n", $lines);
+    }
+
+    /**
+     * Representative photo URLs: product-level first, then one per variant,
+     * deduped and capped at 10.
+     *
+     * @return array<string>
+     */
+    private function imagesFor(array $p): array
+    {
+        $images = $p['images'];
+        foreach ($p['variants'] as $v) {
+            foreach ($v['images'] as $u) {
+                $images[] = $u;
+            }
+        }
+
+        return array_slice(array_values(array_unique(array_filter($images))), 0, 10);
+    }
+
+    private function money($value): string
+    {
+        $value = (float) $value;
+
+        return $value == (int) $value
+            ? number_format($value, 0, '.', ',')
+            : number_format($value, 2, '.', ',');
+    }
+
+    /**
+     * Send a product's catalog photos by URL (the staff tapped "Fotos" and
+     * confirmed). Stores a local thumbnail per image so the thread shows it.
+     */
+    public function quickPhotos(Request $request, WhatsAppClient $whatsapp, $phone)
+    {
+        $request->validate(['product_id' => ['required', 'integer']]);
+
+        $p = app(MetabotCatalog::class)->products([$request->input('product_id')])[0] ?? null;
+        if (!$p) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Producto no encontrado.');
+        }
+
+        $images = $this->imagesFor($p);
+        if (empty($images)) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Este producto no tiene fotos.');
+        }
+
+        $sent = 0;
+        foreach ($images as $url) {
+            $resp = $whatsapp->sendImageByUrl($phone, $url, $p['nombre']);
+            if (($resp['status'] ?? 0) !== 200 || !data_get($resp, 'body.messages.0.id')) {
+                continue;
+            }
+
+            // Keep a local copy so the thread renders a thumbnail (best-effort).
+            $mediaPath = null;
+            try {
+                $bin = Http::timeout(15)->get($url);
+                if ($bin->successful()) {
+                    $mediaPath = $whatsapp->putMedia($bin->body(), $bin->header('Content-Type'));
+                }
+            } catch (\Throwable $e) {
+                Log::warning('metabot: quickPhotos thumbnail fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
+            }
+
+            DB::table('metabot_events')->insert([
+                'wa_message_id' => data_get($resp, 'body.messages.0.id'),
+                'direction'     => 'out',
+                'from_phone'    => null,
+                'to_phone'      => $phone,
+                'kind'          => 'human_image',
+                'body'          => '[imagen] ' . $p['nombre'],
+                'media_path'    => $mediaPath,
+                'payload'       => json_encode($resp, JSON_UNESCAPED_UNICODE),
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
+            $sent++;
+        }
+
+        if ($sent === 0) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])
+                ->with('error', 'No se pudieron enviar las fotos (posible ventana de 24h vencida).');
+        }
+
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->status = 'handed_off';
+        $conv->last_message_at = now();
+        $conv->save();
+
+        return redirect()->route('metabot.inbox.show', ['phone' => $phone])
+            ->with('success', $sent . ' foto(s) enviada(s).');
     }
 
     // Stream a stored media file inline (behind the inbox's role gate).

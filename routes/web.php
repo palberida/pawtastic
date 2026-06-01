@@ -156,6 +156,7 @@ Route::middleware(['role:ceo,administrador,vendedor'])->group(function () {
     Route::post('/metabot/inbox/{phone}/reply',    [MetabotInboxController::class, 'reply'])->name('metabot.inbox.reply');
     Route::post('/metabot/inbox/{phone}/template', [MetabotInboxController::class, 'sendTemplate'])->name('metabot.inbox.template');
     Route::post('/metabot/inbox/{phone}/image',    [MetabotInboxController::class, 'sendImage'])->name('metabot.inbox.image');
+    Route::post('/metabot/inbox/{phone}/photos',   [MetabotInboxController::class, 'quickPhotos'])->name('metabot.inbox.quickphotos');
 });
 
 // Metabot admin — configure which ads the bot engages and its FAQ answers.
