@@ -27,7 +27,9 @@
                         <a href="{{ route('metabot.inbox.show', ['phone' => $c->phone]) }}"
                            class="flex justify-between items-center py-3 px-3 border-b border-gray-100 hover:bg-gray-50"
                            @if($c->pending) style="background:#eff6ff;border-left:4px solid #3b82f6;" @endif>
-                            <div class="min-w-0">
+                            <div class="flex items-center" style="gap:12px;min-width:0;">
+                                @include('metabot.inbox._avatar', ['name' => $c->name, 'phone' => $c->phone, 'size' => 40])
+                                <div class="min-w-0">
                                 <div class="flex items-center" style="gap:8px;">
                                     @if($c->pending)
                                         <span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:#3b82f6;flex:none;"></span>
@@ -47,6 +49,7 @@
                                 </div>
                                 <div class="text-sm truncate" style="max-width: 32rem;{{ $c->pending ? 'color:#374151;' : 'color:#6b7280;' }}">
                                     @if($c->last_direction === 'out')<span class="text-gray-400">↩ </span>@endif{{ $c->last_body }}
+                                </div>
                                 </div>
                             </div>
                             <div class="text-xs text-gray-400 whitespace-nowrap ml-4">{{ $c->last_at }}</div>
