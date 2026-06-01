@@ -34,7 +34,7 @@
                 <strong style="color: {{ $line['role'] === 'user' ? '#111827' : '#15803d' }};">
                     {{ $line['role'] === 'user' ? 'Cliente' : 'Bot' }}:
                 </strong>
-                {{ $line['text'] }}
+                {{ $line['content'] }}
             </p>
         @empty
             <p style="color:#6b7280; margin:0;">(sin mensajes)</p>

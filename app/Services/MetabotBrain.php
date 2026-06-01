@@ -226,9 +226,9 @@ class MetabotBrain
             $turns[] = ['role' => 'user', 'text' => '[el cliente abrió el chat desde el anuncio]'];
         }
 
+        // Anthropic messages take only {role, content}; any extra key is a 400.
         return array_map(fn ($t) => [
             'role'    => $t['role'],
-            'text'    => $t['text'],
             'content' => $t['text'],
         ], $turns);
     }
