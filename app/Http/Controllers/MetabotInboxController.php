@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\DB;
 
 class MetabotInboxController extends Controller
 {
+    // Outbound kinds the customer actually receives. An internal row like
+    // bot_escalate is NOT here: when the bot hands off, the customer got nothing,
+    // so the chat must still read as pending a human reply.
+    private const CUSTOMER_FACING = [
+        'bot_text', 'bot_list', 'bot_image', 'bot_faq',
+        'human_reply', 'human_image', 'template', 'sent_buttons',
+    ];
+
     public function index()
     {
         // A conversation is keyed by the customer phone, which appears as
@@ -20,7 +28,9 @@ class MetabotInboxController extends Controller
             ->distinct()
             ->pluck('from_phone');
 
-        $conversations = $phones->map(function ($phone) {
+        $statuses = MetabotConversation::pluck('status', 'phone');
+
+        $conversations = $phones->map(function ($phone) use ($statuses) {
             $last = DB::table('metabot_events')
                 ->where(function ($q) use ($phone) {
                     $q->where('from_phone', $phone)->orWhere('to_phone', $phone);
@@ -29,15 +39,36 @@ class MetabotInboxController extends Controller
                 ->orderByDesc('id')
                 ->first();
 
+            // Pending = the customer's last message has no customer-facing reply after it.
+            $lastInboundId = DB::table('metabot_events')
+                ->where('from_phone', $phone)->where('direction', 'in')
+                ->max('id');
+            $lastReplyId = DB::table('metabot_events')
+                ->where('to_phone', $phone)->where('direction', 'out')
+                ->whereIn('kind', self::CUSTOMER_FACING)
+                ->max('id');
+            $pending = $lastInboundId && (!$lastReplyId || $lastInboundId > $lastReplyId);
+
             return (object) [
                 'phone'          => $phone,
                 'last_at'        => $last->created_at ?? null,
                 'last_body'      => $this->previewText($last),
                 'last_direction' => $last->direction ?? null,
+                'status'         => $statuses[$phone] ?? null,
+                'pending'        => (bool) $pending,
             ];
-        })->sortByDesc('last_at')->values();
+        })->sort(function ($a, $b) {
+            // Pending first, then newest activity. Explicit comparator so ordering is
+            // stable on PHP 7.4 (where sort() isn't guaranteed stable).
+            if ($a->pending !== $b->pending) {
+                return $a->pending ? -1 : 1;
+            }
+            return strcmp((string) $b->last_at, (string) $a->last_at);
+        })->values();
 
-        return view('metabot.inbox.index', compact('conversations'));
+        $pendingCount = $conversations->where('pending', true)->count();
+
+        return view('metabot.inbox.index', compact('conversations', 'pendingCount'));
     }
 
     public function show($phone)
