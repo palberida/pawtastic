@@ -20,6 +20,7 @@ use App\Http\Controllers\WhatsAppWebhookController;
 use App\Http\Controllers\MetabotAdController;
 use App\Http\Controllers\MetabotFaqController;
 use App\Http\Controllers\MetabotInboxController;
+use App\Http\Controllers\MetabotTagController;
 use App\Http\Controllers\MetabotTemplateController;
 
 /*
@@ -178,6 +179,13 @@ Route::middleware(['role:ceo,administrador'])->group(function () {
     Route::post('/metabot/templates',          [MetabotTemplateController::class, 'store'])->name('metabot.templates.store');
     Route::get('/metabot/templates/{id}/edit', [MetabotTemplateController::class, 'edit'])->name('metabot.templates.edit');
     Route::post('/metabot/templates/{id}',     [MetabotTemplateController::class, 'update'])->name('metabot.templates.update');
+
+    // Tag manager — edit product/variant product_tags from the UI.
+    Route::get('/metabot/tags',                       [MetabotTagController::class, 'index'])->name('metabot.tags.index');
+    Route::get('/metabot/tags/product/{id}',          [MetabotTagController::class, 'product'])->name('metabot.tags.product');
+    Route::post('/metabot/tags/product/{id}',         [MetabotTagController::class, 'saveProduct'])->name('metabot.tags.product.save');
+    Route::get('/metabot/tags/variant/{id}',          [MetabotTagController::class, 'variant'])->name('metabot.tags.variant');
+    Route::post('/metabot/tags/variant/{id}',         [MetabotTagController::class, 'saveVariant'])->name('metabot.tags.variant.save');
 });
 
 // WhatsApp Cloud API webhook — intentionally outside every role middleware group.

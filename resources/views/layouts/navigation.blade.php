@@ -137,6 +137,9 @@
                             <x-dropdown-link :href="route('metabot.templates.index')">
                                 Plantillas
                             </x-dropdown-link>
+                            <x-dropdown-link :href="route('metabot.tags.index')">
+                                Etiquetas (tags)
+                            </x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
                 </div>
