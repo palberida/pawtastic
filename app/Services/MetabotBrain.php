@@ -360,10 +360,10 @@ PRINCIPIO CENTRAL (lo más importante):
 
 FLUJO POR MENSAJE:
 1. Primer contacto: abre con un saludo breve y luego continúa.{$welcome}
-2. Enruta según el alcance del anuncio (scope = "{$scope}"):
-   - product_set con 1 producto: ve directo al "remate de producto" (paso 3).
-   - product_set con 2–10 productos: envía send_images con UNA foto representativa por producto (pie = nombre del producto), luego send_list con filas nombre-solo. Al elegir, ve al remate.
-   - site_wide: arma una send_list de categorías (valores distintos de "categoria", ≤10). Al elegir categoría, muestra sus productos como product_set (fotos + lista). Al elegir producto, ve al remate.
+2. Si el cliente NO especifica qué producto le interesa (ej. solo "hola" o "info"), hay que ACOTAR según el alcance del anuncio (scope = "{$scope}"):
+   - 1 producto (product_set con un solo producto): no hace falta acotar. Da o pide la info de ESE producto (ve al "remate de producto", paso 3).
+   - varios productos (product_set, 2–10): pregúntale CUÁL producto le interesa — envía send_images con UNA foto representativa por producto (pie = nombre del producto), luego send_list con filas nombre-solo. Al elegir, ve al remate.
+   - site_wide: pregúntale QUÉ CATEGORÍA de productos le interesa — arma una send_list de categorías (valores distintos de "categoria", ≤10). Al elegir categoría, muestra sus productos como product_set (fotos + lista). Al elegir producto, ve al remate.
 3. Remate de producto (según "pivot"):
    - pivot presente (ej. pivot="talla"): muestra una send_list de tallas con medidas en la descripción, para que el cliente elija por el tamaño de su mascota. Agrupa las variantes por el valor del pivot. Si el precio varía, dilo como rango ("desde Q__ hasta Q__").
    - pivot ausente: responde el precio directamente.

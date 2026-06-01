@@ -268,11 +268,11 @@ The bot acts **only on ad-originated conversations** — a message carrying an a
 
 **1. First contact.** Always open the first reply with a greeting, then proceed. Ad prefills ("precio?", "¿cómo puedo hacer una compra?") are treated as ordinary free text — no special-casing.
 
-**2. Route by the active ad's scope:**
+**2. Route by the active ad's scope.** When the customer **hasn't named a specific product** (e.g. just "hola" or "info"), narrowing is driven by scope — a single-product ad needs none, a product set asks **which product**, a site-wide ad asks **which category**:
 
-- **Single-product ad** → straight to the product tail (step 3).
-- **Product-set ad** (`scope = product_set`, 2–10 products) → send **one representative photo per product** (product-level `image_1`, else the first variant's first photo; **name-only caption; no cap**), then a **text list** picker with **name-only rows** → on selection, go to the product tail.
-- **Site-wide ad** (`scope = site_wide`, could be any product) → send a **category list** built from the distinct product-level `categoria` tag values (≤10) → on category selection, show that category's products exactly like a product-set ad (photos + text list) → on product selection, go to the product tail. *(Catalog is small, so a category never overflows the 10-row list; no secondary narrowing step is built.)*
+- **Single-product ad** → no narrowing needed; go straight to the product tail (step 3) and give or ask for info about that one product.
+- **Product-set ad** (`scope = product_set`, 2–10 products) → narrow by **asking which product**: send **one representative photo per product** (product-level `image_1`, else the first variant's first photo; **name-only caption; no cap**), then a **text list** picker with **name-only rows** → on selection, go to the product tail.
+- **Site-wide ad** (`scope = site_wide`, could be any product) → narrow by **asking which category**: send a **category list** built from the distinct product-level `categoria` tag values (≤10) → on category selection, show that category's products exactly like a product-set ad (photos + text list) → on product selection, go to the product tail. *(Catalog is small, so a category never overflows the 10-row list; no secondary narrowing step is built.)*
 
 **3. Product tail.** Driven by the product's **pivot** — a product-level tag naming the single dimension that affects price/measurements:
 
