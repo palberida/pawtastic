@@ -70,6 +70,16 @@ class WhatsAppWebhookController extends Controller
         if ($this->isSimulatorMessage($from, $type, $message)) {
             $message['text']['body'] = $this->stripSimPrefix(data_get($message, 'text.body'));
             $referralSourceId        = config('metabot.simulator_source_id');
+
+            // The simulator is a test harness: each adtest starts a CLEAN run. Wipe this
+            // phone's prior events + conversation state before logging the new message,
+            // so Claude sees a fresh first contact instead of a stale, repeated history.
+            // Gated to the simulator phone, so real customers are never affected.
+            DB::table('metabot_events')
+                ->where('from_phone', $from)
+                ->orWhere('to_phone', $from)
+                ->delete();
+            MetabotConversation::where('phone', $from)->delete();
         }
 
         $isButtonReply = $type === 'interactive'
