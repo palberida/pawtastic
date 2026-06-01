@@ -41,23 +41,39 @@ class MetabotTagController extends Controller
         $variants    = Variant::where('id_producto', $id)->orderBy('descripcion')
             ->get(['id', 'descripcion', 'codigo', 'precio', 'stock']);
 
-        $variantTagCounts = ProductTag::where('id_producto', $id)->whereNotNull('id_variante')
-            ->selectRaw('id_variante, COUNT(*) as c')
-            ->groupBy('id_variante')
-            ->pluck('c', 'id_variante');
+        // Each variant's current tags, keyed by variant id, for the inline editors.
+        $variantTags = ProductTag::where('id_producto', $id)->whereNotNull('id_variante')
+            ->orderBy('tag')->get()->groupBy('id_variante');
 
-        return view('metabot.tags.product', compact('product', 'productTags', 'variants', 'variantTagCounts'));
+        return view('metabot.tags.product', compact('product', 'productTags', 'variants', 'variantTags'));
     }
 
+    /**
+     * Saves the whole product screen in one POST: the product-level tags plus
+     * every variant's tags (variant_tags[variantId][], variant_values[...][]).
+     */
     public function saveProduct(Request $request, $id)
     {
         $product = Product::findOrFail($id);
         $this->validateTags($request);
 
+        // Product-level tags.
         $this->replaceTags((int) $product->id, null, $request->input('tags', []), $request->input('values', []));
 
+        // Variant-level tags — only for variants that actually belong to this product.
+        $validVariantIds = Variant::where('id_producto', $product->id)->pluck('id')
+            ->map(fn ($i) => (int) $i)->all();
+        $variantValues = $request->input('variant_values', []);
+        foreach ($request->input('variant_tags', []) as $variantId => $vtags) {
+            $vid = (int) $variantId;
+            if (!in_array($vid, $validVariantIds, true)) {
+                continue;
+            }
+            $this->replaceTags((int) $product->id, $vid, is_array($vtags) ? $vtags : [], $variantValues[$variantId] ?? []);
+        }
+
         return redirect()->route('metabot.tags.product', ['id' => $product->id])
-            ->with('success', 'Tags del producto guardados.');
+            ->with('success', 'Tags guardados.');
     }
 
     public function variant($id)
@@ -98,10 +114,16 @@ class MetabotTagController extends Controller
     private function validateTags(Request $request): void
     {
         $request->validate([
-            'tags'     => ['array'],
-            'tags.*'   => ['nullable', 'string', 'max:50'],
-            'values'   => ['array'],
-            'values.*' => ['nullable', 'string', 'max:500'],
+            'tags'              => ['array'],
+            'tags.*'            => ['nullable', 'string', 'max:50'],
+            'values'            => ['array'],
+            'values.*'          => ['nullable', 'string', 'max:500'],
+            'variant_tags'      => ['array'],
+            'variant_tags.*'    => ['array'],
+            'variant_tags.*.*'  => ['nullable', 'string', 'max:50'],
+            'variant_values'    => ['array'],
+            'variant_values.*'  => ['array'],
+            'variant_values.*.*' => ['nullable', 'string', 'max:500'],
         ]);
     }
 
