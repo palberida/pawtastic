@@ -29,8 +29,9 @@ class MetabotInboxController extends Controller
             ->pluck('from_phone');
 
         $statuses = MetabotConversation::pluck('status', 'phone');
+        $names    = DB::table('metabot_contacts')->pluck('name', 'phone');
 
-        $conversations = $phones->map(function ($phone) use ($statuses) {
+        $conversations = $phones->map(function ($phone) use ($statuses, $names) {
             $last = DB::table('metabot_events')
                 ->where(function ($q) use ($phone) {
                     $q->where('from_phone', $phone)->orWhere('to_phone', $phone);
@@ -51,6 +52,7 @@ class MetabotInboxController extends Controller
 
             return (object) [
                 'phone'          => $phone,
+                'name'           => $names[$phone] ?? null,
                 'last_at'        => $last->created_at ?? null,
                 'last_body'      => $this->previewText($last),
                 'last_direction' => $last->direction ?? null,
@@ -75,8 +77,9 @@ class MetabotInboxController extends Controller
     {
         $messages  = $this->threadFor($phone);
         $templates = MetabotTemplate::where('status', 'active')->orderBy('label')->orderBy('name')->get();
+        $name      = DB::table('metabot_contacts')->where('phone', $phone)->value('name');
 
-        return view('metabot.inbox.show', compact('phone', 'messages', 'templates'));
+        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name'));
     }
 
     // Stream a stored media file inline (behind the inbox's role gate).

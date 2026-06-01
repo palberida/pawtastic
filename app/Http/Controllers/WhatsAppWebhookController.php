@@ -46,6 +46,10 @@ class WhatsAppWebhookController extends Controller
 
         foreach (data_get($data, 'entry', []) as $entry) {
             foreach (data_get($entry, 'changes', []) as $change) {
+                // Remember each customer's WhatsApp profile name (sibling of messages).
+                foreach (data_get($change, 'value.contacts', []) as $contact) {
+                    $this->rememberContact($contact);
+                }
                 foreach (data_get($change, 'value.messages', []) as $message) {
                     $this->processMessage($message, $whatsapp);
                 }
@@ -53,6 +57,21 @@ class WhatsAppWebhookController extends Controller
         }
 
         return response('', 200);
+    }
+
+    // Upsert a customer's WhatsApp display name so the inbox can show it.
+    private function rememberContact(array $contact): void
+    {
+        $phone = $contact['wa_id'] ?? null;
+        $name  = data_get($contact, 'profile.name');
+        if (!$phone || $name === null || $name === '') {
+            return;
+        }
+
+        DB::table('metabot_contacts')->updateOrInsert(
+            ['phone' => $phone],
+            ['name' => mb_substr((string) $name, 0, 255), 'updated_at' => now()]
+        );
     }
 
     private function processMessage(array $message, WhatsAppClient $whatsapp): void

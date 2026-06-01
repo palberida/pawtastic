@@ -32,7 +32,12 @@
                                     @if($c->pending)
                                         <span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:#3b82f6;flex:none;"></span>
                                     @endif
-                                    <span style="{{ $c->pending ? 'font-weight:700;color:#111827;' : 'font-weight:600;color:#374151;' }}">+{{ $c->phone }}</span>
+                                    @if($c->name)
+                                        <span style="{{ $c->pending ? 'font-weight:700;color:#111827;' : 'font-weight:600;color:#374151;' }}">{{ $c->name }}</span>
+                                        <span class="text-xs text-gray-400">+{{ $c->phone }}</span>
+                                    @else
+                                        <span style="{{ $c->pending ? 'font-weight:700;color:#111827;' : 'font-weight:600;color:#374151;' }}">+{{ $c->phone }}</span>
+                                    @endif
                                     @if($c->pending)
                                         <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:9999px;background:#dbeafe;color:#1d4ed8;white-space:nowrap;">Pendiente</span>
                                     @endif
