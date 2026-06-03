@@ -107,25 +107,89 @@ class MetabotInboxController extends Controller
         foreach ($catalog as $group) {
             $products = [];
             foreach ($group['products'] as $p) {
-                $price    = $this->composePrice($p);
-                $measures = $this->composeMeasures($p);
-                $images   = $this->imagesFor($p);
-
                 $products[] = [
-                    'id'            => $p['id'],
-                    'nombre'        => $p['nombre'],
-                    'price_text'    => $price,
-                    'measures_text' => $measures,
-                    'images'        => $images,
-                    'has_price'     => $price !== null,
-                    'has_measures'  => $measures !== null,
-                    'has_photos'    => !empty($images),
+                    'id'     => $p['id'],
+                    'nombre' => $p['nombre'],
+                    'groups' => $this->composeGroups($p),
+                    'images' => $this->imagesFor($p),
                 ];
             }
             $menu[] = ['categoria' => $group['categoria'], 'products' => $products];
         }
 
         return $menu;
+    }
+
+    /**
+     * Per-product quick-reply buttons, one per variant tag-group.
+     *
+     * The button set is derived from the union of the product's descriptive tags
+     * (image_N / pivot / categoria are already stripped by the catalog). Two
+     * families collapse to a single button: every `medidas_*` tag becomes one
+     * "Medidas", and the `image_*` photos become one "Fotos". Every other tag
+     * (color, talla, material, …) gets its own button. Price is prepended as the
+     * most-used quick reply even though it isn't a tag.
+     *
+     * Each group is {key, label, type: 'text'|'photos', text?}. 'text' groups
+     * prefill the reply box; the 'photos' group opens the send-photos preview.
+     *
+     * @return array<array{key:string,label:string,type:string,text?:string}>
+     */
+    private function composeGroups(array $p): array
+    {
+        $groups = [];
+
+        $price = $this->composePrice($p);
+        if ($price !== null) {
+            $groups[] = ['key' => 'precio', 'label' => '💰 Precio', 'type' => 'text', 'text' => $price];
+        }
+
+        // Union of descriptive tag names across the product and its variants.
+        $tagKeys = [];
+        foreach (array_keys($p['tags']) as $t) {
+            $tagKeys[$t] = true;
+        }
+        foreach ($p['variants'] as $v) {
+            foreach (array_keys($v['tags']) as $t) {
+                $tagKeys[$t] = true;
+            }
+        }
+
+        // medidas_* collapse into one "Medidas"; everything else is its own group.
+        $hasMedidas = false;
+        $attrs      = [];
+        foreach (array_keys($tagKeys) as $tag) {
+            if (strpos($tag, 'medidas_') === 0) {
+                $hasMedidas = true;
+                continue;
+            }
+            $attrs[$tag] = true;
+        }
+
+        $dynamic = [];
+        if ($hasMedidas) {
+            $text = $this->composeMedidas($p);
+            if ($text !== null) {
+                $dynamic['medidas'] = ['key' => 'medidas', 'label' => '📏 Medidas', 'type' => 'text', 'text' => $text];
+            }
+        }
+        foreach (array_keys($attrs) as $tag) {
+            $text = $this->composeAttribute($p, $tag);
+            if ($text !== null) {
+                $dynamic[$tag] = ['key' => $tag, 'label' => $this->prettyLabel($tag), 'type' => 'text', 'text' => $text];
+            }
+        }
+        ksort($dynamic);
+        foreach ($dynamic as $g) {
+            $groups[] = $g;
+        }
+
+        // image_* collapse into one "Fotos" (sent, not prefilled).
+        if (!empty($this->imagesFor($p))) {
+            $groups[] = ['key' => 'fotos', 'label' => '📷 Fotos', 'type' => 'photos'];
+        }
+
+        return $groups;
     }
 
     private function composePrice(array $p): ?string
@@ -144,10 +208,13 @@ class MetabotInboxController extends Controller
         return $line;
     }
 
-    private function composeMeasures(array $p): ?string
+    /**
+     * The "Medidas" reply: only the medidas_* tags, grouped by the pivot value
+     * (e.g. one line per talla) when the product has a pivot, otherwise a flat list.
+     */
+    private function composeMedidas(array $p): ?string
     {
-        $exclude = ['color', 'info']; // descriptive, not measurements
-        $lines   = [];
+        $lines = [];
 
         if (!empty($p['pivot'])) {
             $seen = [];
@@ -160,21 +227,20 @@ class MetabotInboxController extends Controller
 
                 $measures = [];
                 foreach ($v['tags'] as $tag => $val) {
-                    if (!in_array($tag, $exclude, true)) {
-                        $measures[] = "{$tag}: {$val}";
+                    if (strpos($tag, 'medidas_') === 0 && $val !== null && $val !== '') {
+                        $measures[] = $this->prettyMeasureLabel($tag) . ": {$val}";
                     }
                 }
-                $label   = ucfirst($p['pivot']) . " {$pv}";
-                $lines[] = $measures ? "• {$label} — " . implode(', ', $measures) : "• {$label}";
+                if ($measures) {
+                    $label   = ucfirst($p['pivot']) . " {$pv}";
+                    $lines[] = "• {$label} — " . implode(', ', $measures);
+                }
             }
         } else {
-            $tags = $p['tags'];
-            if (empty($tags) && !empty($p['variants'])) {
-                $tags = $p['variants'][0]['tags'];
-            }
+            $tags = !empty($p['tags']) ? $p['tags'] : (!empty($p['variants']) ? $p['variants'][0]['tags'] : []);
             foreach ($tags as $tag => $val) {
-                if (!in_array($tag, $exclude, true)) {
-                    $lines[] = "• {$tag}: {$val}";
+                if (strpos($tag, 'medidas_') === 0 && $val !== null && $val !== '') {
+                    $lines[] = '• ' . $this->prettyMeasureLabel($tag) . ": {$val}";
                 }
             }
         }
@@ -184,6 +250,44 @@ class MetabotInboxController extends Controller
         }
 
         return "📏 Medidas de {$p['nombre']}:\n" . implode("\n", $lines);
+    }
+
+    /**
+     * A single descriptive tag (color, talla, material, …) as a quick reply:
+     * the distinct values that tag takes across the product and its variants.
+     */
+    private function composeAttribute(array $p, string $tag): ?string
+    {
+        $values = [];
+        if (isset($p['tags'][$tag]) && $p['tags'][$tag] !== '') {
+            $values[] = $p['tags'][$tag];
+        }
+        foreach ($p['variants'] as $v) {
+            if (isset($v['tags'][$tag]) && $v['tags'][$tag] !== null && $v['tags'][$tag] !== '') {
+                $values[] = $v['tags'][$tag];
+            }
+        }
+        $values = array_values(array_unique($values));
+        if (empty($values)) {
+            return null;
+        }
+
+        return $this->prettyLabel($tag) . " de {$p['nombre']}: " . implode(', ', $values);
+    }
+
+    // "color" → "Color", "tipo_correa" → "Tipo correa".
+    private function prettyLabel(string $tag): string
+    {
+        return ucfirst(str_replace('_', ' ', $tag));
+    }
+
+    // "medidas_cuello_cm" → "cuello (cm)".
+    private function prettyMeasureLabel(string $tag): string
+    {
+        $s = preg_replace('/^medidas_/', '', $tag);
+        $s = preg_replace('/_(cm|mm|m|in|kg|g|lb|ml|l)$/', ' ($1)', $s);
+
+        return str_replace('_', ' ', $s);
     }
 
     /**

@@ -104,7 +104,7 @@
             showPreview();
         }
 
-        // --- Quick replies: Categorías → Productos → Precio / Medidas / Fotos ---
+        // --- Quick replies: Categorías → Productos → grupos de tags (Precio / color / Medidas / talla / Fotos…) ---
         var MENU       = @json($quickMenu ?? []);
         var CSRF       = "{{ csrf_token() }}";
         var PHOTOS_URL = "{{ route('metabot.inbox.quickphotos', ['phone' => $phone]) }}";
@@ -198,18 +198,27 @@
                     qrBack.style.display = '';
                     var p = MENU[state.cat].products[state.prod];
                     qrCrumb.textContent = p.nombre + ' · elige qué enviar.';
-                    qrButtons.appendChild(pill('💰 Precio', {
-                        disabled: !p.has_price, accent: '#ecfdf5', color: '#065f46',
-                        onClick: function () { fillReply(p.price_text); }
-                    }));
-                    qrButtons.appendChild(pill('📏 Medidas', {
-                        disabled: !p.has_measures, accent: '#eff6ff', color: '#1e40af',
-                        onClick: function () { fillReply(p.measures_text); }
-                    }));
-                    qrButtons.appendChild(pill('📷 Fotos', {
-                        disabled: !p.has_photos, accent: '#fef3c7', color: '#92400e',
-                        onClick: function () { showPhotos(p); }
-                    }));
+                    var groups = p.groups || [];
+                    if (!groups.length) {
+                        var none = document.createElement('span');
+                        none.style.cssText = 'font-size:13px;color:#9ca3af;';
+                        none.textContent = 'Este producto no tiene tags todavía.';
+                        qrButtons.appendChild(none);
+                    }
+                    groups.forEach(function (grp) {
+                        var accent, color;
+                        if (grp.type === 'photos')      { accent = '#fef3c7'; color = '#92400e'; }
+                        else if (grp.key === 'precio')  { accent = '#ecfdf5'; color = '#065f46'; }
+                        else if (grp.key === 'medidas') { accent = '#eff6ff'; color = '#1e40af'; }
+                        else                            { accent = '#f5f3ff'; color = '#5b21b6'; }
+                        qrButtons.appendChild(pill(grp.label, {
+                            accent: accent, color: color,
+                            onClick: function () {
+                                if (grp.type === 'photos') { showPhotos(p); }
+                                else { fillReply(grp.text); }
+                            }
+                        }));
+                    });
                 }
             }
 
