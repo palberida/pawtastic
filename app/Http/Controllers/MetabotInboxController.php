@@ -87,10 +87,16 @@ class MetabotInboxController extends Controller
     }
 
     /**
-     * Catalog drill-down for the quick-reply console: categories → products →
-     * precomposed Price / Measurements text + photo URLs. Built read-only from
-     * the catalog; a failure (e.g. RO user not provisioned) degrades to an empty
-     * menu instead of breaking the chat page.
+     * Data for the quick-reply console: categories → products → tag-narrowing drill.
+     *
+     * The drill itself (scan variant tags → if one value, prefill; if many, show
+     * the values and narrow, then re-scan) runs client-side over the variant data
+     * shipped here — the catalog is small and the narrowing is a tree-walk. So per
+     * product we ship the product-level terminal tags plus every variant's tags,
+     * price, stock flag and photo URLs.
+     *
+     * Built read-only; a failure (e.g. RO user not provisioned) degrades to an
+     * empty menu instead of breaking the chat page.
      *
      * @return array
      */
@@ -107,12 +113,7 @@ class MetabotInboxController extends Controller
         foreach ($catalog as $group) {
             $products = [];
             foreach ($group['products'] as $p) {
-                $products[] = [
-                    'id'     => $p['id'],
-                    'nombre' => $p['nombre'],
-                    'groups' => $this->composeGroups($p),
-                    'images' => $this->imagesFor($p),
-                ];
+                $products[] = $this->productForMenu($p);
             }
             $menu[] = ['categoria' => $group['categoria'], 'products' => $products];
         }
@@ -121,158 +122,45 @@ class MetabotInboxController extends Controller
     }
 
     /**
-     * Per-product quick-reply buttons, one per variant tag-group.
-     *
-     * The button set is derived from the union of the product's descriptive tags
-     * (image_N / pivot / categoria are already stripped by the catalog). Two
-     * families collapse to a single button: every `medidas_*` tag becomes one
-     * "Medidas", and the `image_*` photos become one "Fotos". Every other tag
-     * (color, talla, material, …) gets its own button. Price is prepended as the
-     * most-used quick reply even though it isn't a tag.
-     *
-     * Each group is {key, label, type: 'text'|'photos', text?}. 'text' groups
-     * prefill the reply box; the 'photos' group opens the send-photos preview.
-     *
-     * @return array<array{key:string,label:string,type:string,text?:string}>
+     * Shape one catalog product for the drill: product-level terminal tags (row 1)
+     * plus the raw variant data the client narrows over.
      */
-    private function composeGroups(array $p): array
+    private function productForMenu(array $p): array
     {
-        $groups = [];
-
-        $price = $this->composePrice($p);
-        if ($price !== null) {
-            $groups[] = ['key' => 'precio', 'label' => '💰 Precio', 'type' => 'text', 'text' => $price];
-        }
-
-        // Union of descriptive tag names across the product and its variants.
-        $tagKeys = [];
-        foreach (array_keys($p['tags']) as $t) {
-            $tagKeys[$t] = true;
-        }
-        foreach ($p['variants'] as $v) {
-            foreach (array_keys($v['tags']) as $t) {
-                $tagKeys[$t] = true;
-            }
-        }
-
-        // medidas_* collapse into one "Medidas"; everything else is its own group.
-        $hasMedidas = false;
-        $attrs      = [];
-        foreach (array_keys($tagKeys) as $tag) {
-            if (strpos($tag, 'medidas_') === 0) {
-                $hasMedidas = true;
+        // Row 1: product-level tags. These apply to the whole product, so they are
+        // terminal (click → value). medidas_* surface via the per-scope Medidas
+        // button instead; image_N / pivot / categoria are already stripped upstream.
+        $productTags = [];
+        foreach ($p['tags'] as $tag => $val) {
+            if ($val === null || $val === '' || strpos($tag, 'medidas_') === 0) {
                 continue;
             }
-            $attrs[$tag] = true;
+            $productTags[] = [
+                'label' => $this->prettyLabel($tag),
+                'text'  => $this->prettyLabel($tag) . ' de ' . $p['nombre'] . ': ' . $val,
+            ];
         }
 
-        $dynamic = [];
-        if ($hasMedidas) {
-            $text = $this->composeMedidas($p);
-            if ($text !== null) {
-                $dynamic['medidas'] = ['key' => 'medidas', 'label' => '📏 Medidas', 'type' => 'text', 'text' => $text];
-            }
-        }
-        foreach (array_keys($attrs) as $tag) {
-            $text = $this->composeAttribute($p, $tag);
-            if ($text !== null) {
-                $dynamic[$tag] = ['key' => $tag, 'label' => $this->prettyLabel($tag), 'type' => 'text', 'text' => $text];
-            }
-        }
-        ksort($dynamic);
-        foreach ($dynamic as $g) {
-            $groups[] = $g;
-        }
-
-        // image_* collapse into one "Fotos" (sent, not prefilled).
-        if (!empty($this->imagesFor($p))) {
-            $groups[] = ['key' => 'fotos', 'label' => '📷 Fotos', 'type' => 'photos'];
-        }
-
-        return $groups;
-    }
-
-    private function composePrice(array $p): ?string
-    {
-        if ($p['precio_min'] === null) {
-            return null;
-        }
-        $line = $p['precio_min'] == $p['precio_max']
-            ? "💰 {$p['nombre']}: Q" . $this->money($p['precio_min'])
-            : "💰 {$p['nombre']}: desde Q" . $this->money($p['precio_min']) . ' hasta Q' . $this->money($p['precio_max']);
-
-        if (!empty($p['agotado_todo'])) {
-            $line .= ' (agotado)';
-        }
-
-        return $line;
-    }
-
-    /**
-     * The "Medidas" reply: only the medidas_* tags, grouped by the pivot value
-     * (e.g. one line per talla) when the product has a pivot, otherwise a flat list.
-     */
-    private function composeMedidas(array $p): ?string
-    {
-        $lines = [];
-
-        if (!empty($p['pivot'])) {
-            $seen = [];
-            foreach ($p['variants'] as $v) {
-                $pv = $v['pivot_valor'];
-                if ($pv === null || isset($seen[$pv])) {
-                    continue;
-                }
-                $seen[$pv] = true;
-
-                $measures = [];
-                foreach ($v['tags'] as $tag => $val) {
-                    if (strpos($tag, 'medidas_') === 0 && $val !== null && $val !== '') {
-                        $measures[] = $this->prettyMeasureLabel($tag) . ": {$val}";
-                    }
-                }
-                if ($measures) {
-                    $label   = ucfirst($p['pivot']) . " {$pv}";
-                    $lines[] = "• {$label} — " . implode(', ', $measures);
-                }
-            }
-        } else {
-            $tags = !empty($p['tags']) ? $p['tags'] : (!empty($p['variants']) ? $p['variants'][0]['tags'] : []);
-            foreach ($tags as $tag => $val) {
-                if (strpos($tag, 'medidas_') === 0 && $val !== null && $val !== '') {
-                    $lines[] = '• ' . $this->prettyMeasureLabel($tag) . ": {$val}";
-                }
-            }
-        }
-
-        if (empty($lines)) {
-            return null;
-        }
-
-        return "📏 Medidas de {$p['nombre']}:\n" . implode("\n", $lines);
-    }
-
-    /**
-     * A single descriptive tag (color, talla, material, …) as a quick reply:
-     * the distinct values that tag takes across the product and its variants.
-     */
-    private function composeAttribute(array $p, string $tag): ?string
-    {
-        $values = [];
-        if (isset($p['tags'][$tag]) && $p['tags'][$tag] !== '') {
-            $values[] = $p['tags'][$tag];
-        }
+        $variants = [];
         foreach ($p['variants'] as $v) {
-            if (isset($v['tags'][$tag]) && $v['tags'][$tag] !== null && $v['tags'][$tag] !== '') {
-                $values[] = $v['tags'][$tag];
-            }
-        }
-        $values = array_values(array_unique($values));
-        if (empty($values)) {
-            return null;
+            $variants[] = [
+                'tags'        => (object) $v['tags'], // force a JSON object even when empty
+                'pivot_valor' => $v['pivot_valor'],
+                'precio'      => $v['precio'],
+                'agotado'     => $v['agotado'],
+                'images'      => $v['images'],
+            ];
         }
 
-        return $this->prettyLabel($tag) . " de {$p['nombre']}: " . implode(', ', $values);
+        return [
+            'id'             => $p['id'],
+            'nombre'         => $p['nombre'],
+            'pivot'          => $p['pivot'],
+            'pivot_label'    => $p['pivot'] ? $this->prettyLabel($p['pivot']) : null,
+            'product_tags'   => $productTags,
+            'product_images' => $p['images'],
+            'variants'       => $variants,
+        ];
     }
 
     // "color" → "Color", "tipo_correa" → "Tipo correa".
@@ -281,18 +169,10 @@ class MetabotInboxController extends Controller
         return ucfirst(str_replace('_', ' ', $tag));
     }
 
-    // "medidas_cuello_cm" → "cuello (cm)".
-    private function prettyMeasureLabel(string $tag): string
-    {
-        $s = preg_replace('/^medidas_/', '', $tag);
-        $s = preg_replace('/_(cm|mm|m|in|kg|g|lb|ml|l)$/', ' ($1)', $s);
-
-        return str_replace('_', ' ', $s);
-    }
-
     /**
-     * Representative photo URLs: product-level first, then one per variant,
-     * deduped and capped at 10.
+     * All photo URLs that legitimately belong to a product (product-level first,
+     * then per variant), deduped and capped at 10. Used as the allow-list when the
+     * staff sends scoped photos.
      *
      * @return array<string>
      */
@@ -308,29 +188,29 @@ class MetabotInboxController extends Controller
         return array_slice(array_values(array_unique(array_filter($images))), 0, 10);
     }
 
-    private function money($value): string
-    {
-        $value = (float) $value;
-
-        return $value == (int) $value
-            ? number_format($value, 0, '.', ',')
-            : number_format($value, 2, '.', ',');
-    }
-
     /**
      * Send a product's catalog photos by URL (the staff tapped "Fotos" and
      * confirmed). Stores a local thumbnail per image so the thread shows it.
      */
     public function quickPhotos(Request $request, WhatsAppClient $whatsapp, $phone)
     {
-        $request->validate(['product_id' => ['required', 'integer']]);
+        $request->validate([
+            'product_id' => ['required', 'integer'],
+            'images'     => ['array'],
+            'images.*'   => ['string'],
+        ]);
 
         $p = app(MetabotCatalog::class)->products([$request->input('product_id')])[0] ?? null;
         if (!$p) {
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Producto no encontrado.');
         }
 
-        $images = $this->imagesFor($p);
+        // Only ever send URLs that belong to this product's catalog photos. When the
+        // staff narrowed to a variant the client posts that scoped subset; otherwise
+        // fall back to all of the product's photos.
+        $allowed   = $this->imagesFor($p);
+        $requested = $request->input('images', []);
+        $images    = !empty($requested) ? array_values(array_intersect($allowed, $requested)) : $allowed;
         if (empty($images)) {
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Este producto no tiene fotos.');
         }

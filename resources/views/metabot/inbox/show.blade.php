@@ -104,7 +104,11 @@
             showPreview();
         }
 
-        // --- Quick replies: Categorías → Productos → grupos de tags (Precio / color / Medidas / talla / Fotos…) ---
+        // --- Quick replies: Categorías → Productos → drill de tags (narrowing) ---
+        // Level 2 scans the in-scope variants' tags. A tag with one value across the
+        // scope is terminal (click → prefill); a tag with several values opens its
+        // values, and picking one narrows the scope and re-scans. medidas_* collapse
+        // into one "Medidas", image_* into one "Fotos"; both are scope-aware.
         var MENU       = @json($quickMenu ?? []);
         var CSRF       = "{{ csrf_token() }}";
         var PHOTOS_URL = "{{ route('metabot.inbox.quickphotos', ['phone' => $phone]) }}";
@@ -115,7 +119,9 @@
         var replyBox   = document.getElementById('reply-body');
 
         if (qrButtons) {
-            var state = { level: 0, cat: null, prod: null };
+            // filters: chosen {tag,value} pairs. pendingTag: a multi-value tag whose
+            // values we're currently offering.
+            var state = { level: 0, cat: null, prod: null, filters: [], pendingTag: null };
 
             function pill(label, opts) {
                 opts = opts || {};
@@ -140,7 +146,116 @@
                 replyBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
 
-            function showPhotos(p) {
+            // --- helpers over variant data ---
+            function curProduct() { return MENU[state.cat].products[state.prod]; }
+
+            function inScope(prod) {
+                return prod.variants.filter(function (v) {
+                    return state.filters.every(function (f) { return String(v.tags[f.tag]) === String(f.value); });
+                });
+            }
+
+            function distinctValues(variants, tag) {
+                var seen = {}, out = [];
+                variants.forEach(function (v) {
+                    var val = v.tags[tag];
+                    if (val === undefined || val === null || val === '') return;
+                    if (!seen[val]) { seen[val] = true; out.push(val); }
+                });
+                return out;
+            }
+
+            // Tag names present across the scope, minus those already chosen and the
+            // medidas_* family (handled by one Medidas button). image_* never reach
+            // here — the catalog strips them, and photos get their own button.
+            function scanTags(variants) {
+                var seen = {}, out = [];
+                variants.forEach(function (v) {
+                    Object.keys(v.tags).forEach(function (tag) {
+                        if (seen[tag]) return;
+                        if (tag.indexOf('medidas_') === 0) return;
+                        if (state.filters.some(function (f) { return f.tag === tag; })) return;
+                        seen[tag] = true; out.push(tag);
+                    });
+                });
+                out.sort();
+                return out;
+            }
+
+            function prettyLabel(tag) {
+                var s = tag.replace(/_/g, ' ');
+                return s.charAt(0).toUpperCase() + s.slice(1);
+            }
+            function prettyMeasure(tag) {
+                var s = tag.replace(/^medidas_/, '');
+                s = s.replace(/_(cm|mm|m|in|kg|g|lb|ml|l)$/, ' ($1)');
+                return s.replace(/_/g, ' ');
+            }
+            function money(v) {
+                v = Number(v);
+                return (v % 1 === 0)
+                    ? v.toLocaleString('en-US')
+                    : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function hasMedidas(variants) {
+                return variants.some(function (v) {
+                    return Object.keys(v.tags).some(function (t) { return t.indexOf('medidas_') === 0; });
+                });
+            }
+
+            function medidasText(prod, variants) {
+                var lines = [];
+                if (prod.pivot) {
+                    var seen = {};
+                    variants.forEach(function (v) {
+                        var pv = v.pivot_valor;
+                        if (pv === null || pv === undefined || seen[pv]) return;
+                        seen[pv] = true;
+                        var parts = [];
+                        Object.keys(v.tags).forEach(function (tag) {
+                            if (tag.indexOf('medidas_') === 0 && v.tags[tag] !== '' && v.tags[tag] != null) {
+                                parts.push(prettyMeasure(tag) + ': ' + v.tags[tag]);
+                            }
+                        });
+                        if (parts.length) {
+                            lines.push('• ' + (prod.pivot_label || prod.pivot) + ' ' + pv + ' — ' + parts.join(', '));
+                        }
+                    });
+                } else if (variants[0]) {
+                    var v0 = variants[0];
+                    Object.keys(v0.tags).forEach(function (tag) {
+                        if (tag.indexOf('medidas_') === 0 && v0.tags[tag] !== '' && v0.tags[tag] != null) {
+                            lines.push('• ' + prettyMeasure(tag) + ': ' + v0.tags[tag]);
+                        }
+                    });
+                }
+                if (!lines.length) return null;
+                return '📏 Medidas de ' + prod.nombre + ':\n' + lines.join('\n');
+            }
+
+            function priceText(prod, variants) {
+                var prices = variants.map(function (v) { return v.precio; })
+                    .filter(function (x) { return x !== null && x !== undefined; });
+                if (!prices.length) return null;
+                var min = Math.min.apply(null, prices), max = Math.max.apply(null, prices);
+                var line = (min === max)
+                    ? '💰 ' + prod.nombre + ': Q' + money(min)
+                    : '💰 ' + prod.nombre + ': desde Q' + money(min) + ' hasta Q' + money(max);
+                if (variants.length && variants.every(function (v) { return v.agotado; })) line += ' (agotado)';
+                return line;
+            }
+
+            function scopeImages(prod, variants) {
+                var imgs = [];
+                variants.forEach(function (v) { (v.images || []).forEach(function (u) { imgs.push(u); }); });
+                if (!imgs.length) imgs = (prod.product_images || []).slice();
+                var seen = {}, out = [];
+                imgs.forEach(function (u) { if (u && !seen[u]) { seen[u] = true; out.push(u); } });
+                return out.slice(0, 10);
+            }
+
+            function showPhotos(prod, images) {
                 qrPhotos.innerHTML = '';
                 var note = document.createElement('p');
                 note.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:6px;';
@@ -149,7 +264,7 @@
 
                 var gallery = document.createElement('div');
                 gallery.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;';
-                p.images.forEach(function (url) {
+                images.forEach(function (url) {
                     var img = document.createElement('img');
                     img.src = url;
                     img.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;';
@@ -160,11 +275,15 @@
                 var form = document.createElement('form');
                 form.method = 'POST';
                 form.action = PHOTOS_URL;
-                form.innerHTML = '<input type="hidden" name="_token" value="' + CSRF + '">' +
-                    '<input type="hidden" name="product_id" value="' + p.id + '">';
+                var html = '<input type="hidden" name="_token" value="' + CSRF + '">' +
+                    '<input type="hidden" name="product_id" value="' + prod.id + '">';
+                images.forEach(function (url) {
+                    html += '<input type="hidden" name="images[]" value="' + url.replace(/"/g, '&quot;') + '">';
+                });
+                form.innerHTML = html;
                 var send = document.createElement('button');
                 send.type = 'submit';
-                send.textContent = 'Enviar ' + p.images.length + ' foto(s)';
+                send.textContent = 'Enviar ' + images.length + ' foto(s)';
                 send.style.cssText = 'font-size:13px;padding:6px 14px;border-radius:6px;border:none;background:#f59e0b;color:#fff;cursor:pointer;';
                 form.appendChild(send);
                 qrPhotos.appendChild(form);
@@ -173,9 +292,18 @@
                 qrPhotos.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
 
+            function crumbBase(prod) {
+                var base = prod.nombre;
+                if (state.filters.length) {
+                    base += ' · ' + state.filters.map(function (f) { return f.value; }).join(' · ');
+                }
+                return base;
+            }
+
             function render() {
                 qrButtons.innerHTML = '';
                 clearPhotos();
+
                 if (state.level === 0) {
                     qrBack.style.display = 'none';
                     qrCrumb.textContent = 'Elige una categoría.';
@@ -185,47 +313,105 @@
                             onClick: function () { state.level = 1; state.cat = i; render(); }
                         }));
                     });
-                } else if (state.level === 1) {
+                    return;
+                }
+
+                if (state.level === 1) {
                     qrBack.style.display = '';
                     var g = MENU[state.cat];
                     qrCrumb.textContent = g.categoria + ' · elige un producto.';
                     g.products.forEach(function (p, j) {
                         qrButtons.appendChild(pill(p.nombre, {
-                            onClick: function () { state.level = 2; state.prod = j; render(); }
+                            onClick: function () { state.level = 2; state.prod = j; state.filters = []; state.pendingTag = null; render(); }
                         }));
                     });
-                } else {
-                    qrBack.style.display = '';
-                    var p = MENU[state.cat].products[state.prod];
-                    qrCrumb.textContent = p.nombre + ' · elige qué enviar.';
-                    var groups = p.groups || [];
-                    if (!groups.length) {
-                        var none = document.createElement('span');
-                        none.style.cssText = 'font-size:13px;color:#9ca3af;';
-                        none.textContent = 'Este producto no tiene tags todavía.';
-                        qrButtons.appendChild(none);
+                    return;
+                }
+
+                // level 2 — the tag-narrowing drill
+                qrBack.style.display = '';
+                var prod = curProduct();
+                var variants = inScope(prod);
+
+                // Sub-view: offering the values of a multi-value tag.
+                if (state.pendingTag) {
+                    var tag = state.pendingTag;
+                    qrCrumb.textContent = crumbBase(prod) + ' · elige ' + prettyLabel(tag);
+                    distinctValues(variants, tag).forEach(function (val) {
+                        qrButtons.appendChild(pill(val, {
+                            accent: '#f5f3ff', color: '#5b21b6',
+                            onClick: function () { state.filters.push({ tag: tag, value: val }); state.pendingTag = null; render(); }
+                        }));
+                    });
+                    return;
+                }
+
+                qrCrumb.textContent = crumbBase(prod) + ' · elige qué enviar o acota.';
+
+                // Row 1: product-level tags (only at the top of the drill). Terminal.
+                if (state.filters.length === 0) {
+                    prod.product_tags.forEach(function (t) {
+                        qrButtons.appendChild(pill(t.label, {
+                            accent: '#eef2ff', color: '#3730a3',
+                            onClick: function () { fillReply(t.text); }
+                        }));
+                    });
+                }
+
+                // Scanned variant tags: one value → terminal; many → narrow deeper.
+                scanTags(variants).forEach(function (tag) {
+                    var vals = distinctValues(variants, tag);
+                    if (vals.length === 0) return;
+                    if (vals.length === 1) {
+                        var text = prettyLabel(tag) + ' de ' + prod.nombre + ': ' + vals[0];
+                        qrButtons.appendChild(pill(prettyLabel(tag), {
+                            accent: '#f5f3ff', color: '#5b21b6',
+                            onClick: function () { fillReply(text); }
+                        }));
+                    } else {
+                        qrButtons.appendChild(pill(prettyLabel(tag) + ' ▸', {
+                            onClick: function () { state.pendingTag = tag; render(); }
+                        }));
                     }
-                    groups.forEach(function (grp) {
-                        var accent, color;
-                        if (grp.type === 'photos')      { accent = '#fef3c7'; color = '#92400e'; }
-                        else if (grp.key === 'precio')  { accent = '#ecfdf5'; color = '#065f46'; }
-                        else if (grp.key === 'medidas') { accent = '#eff6ff'; color = '#1e40af'; }
-                        else                            { accent = '#f5f3ff'; color = '#5b21b6'; }
-                        qrButtons.appendChild(pill(grp.label, {
-                            accent: accent, color: color,
-                            onClick: function () {
-                                if (grp.type === 'photos') { showPhotos(p); }
-                                else { fillReply(grp.text); }
-                            }
+                });
+
+                // Medidas (scope-aware, terminal).
+                if (hasMedidas(variants)) {
+                    var mt = medidasText(prod, variants);
+                    if (mt) {
+                        qrButtons.appendChild(pill('📏 Medidas', {
+                            accent: '#eff6ff', color: '#1e40af',
+                            onClick: function () { fillReply(mt); }
                         }));
-                    });
+                    }
+                }
+
+                // Precio (scope-aware, terminal).
+                var pt = priceText(prod, variants);
+                if (pt) {
+                    qrButtons.appendChild(pill('💰 Precio', {
+                        accent: '#ecfdf5', color: '#065f46',
+                        onClick: function () { fillReply(pt); }
+                    }));
+                }
+
+                // Fotos (scope-aware).
+                var imgs = scopeImages(prod, variants);
+                if (imgs.length) {
+                    qrButtons.appendChild(pill('📷 Fotos', {
+                        accent: '#fef3c7', color: '#92400e',
+                        onClick: function () { showPhotos(prod, imgs); }
+                    }));
                 }
             }
 
             qrBack.addEventListener('click', function () {
-                if (state.level === 2) { state.level = 1; }
-                else if (state.level === 1) { state.level = 0; }
-                render();
+                if (state.level === 2) {
+                    if (state.pendingTag) { state.pendingTag = null; render(); return; }
+                    if (state.filters.length) { state.filters.pop(); render(); return; }
+                    state.level = 1; render(); return;
+                }
+                if (state.level === 1) { state.level = 0; render(); return; }
             });
 
             render();
