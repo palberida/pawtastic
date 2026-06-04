@@ -221,10 +221,53 @@
                     : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
 
-            function hasMedidas(variants) {
-                return variants.some(function (v) {
-                    return Object.keys(v.tags).some(function (t) { return t.indexOf('medidas_') === 0; });
+            // URLs carried inside a tag whose value is a JSON array (the `images`
+            // convention), e.g. images: ["https://…","https://…"].
+            function urlsFromTags(tagsObj) {
+                var out = [];
+                Object.keys(tagsObj).forEach(function (k) {
+                    var val = tagsObj[k];
+                    if (typeof val !== 'string') return;
+                    var s = val.trim();
+                    if (s.charAt(0) !== '[') return;
+                    try {
+                        var arr = JSON.parse(s);
+                        if (Array.isArray(arr)) arr.forEach(function (u) {
+                            if (typeof u === 'string' && /^https?:\/\//.test(u)) out.push(u);
+                        });
+                    } catch (e) { /* not JSON → ignore */ }
                 });
+                return out;
+            }
+
+            // Measurement "label: value" parts for a variant, from both medidas_*
+            // tags and any tag whose value is a JSON object (the `medidas` convention,
+            // e.g. medidas: {"cuello":"35-41 cm","largo":"46 cm"}).
+            function measuresOf(v) {
+                var parts = [];
+                Object.keys(v.tags).forEach(function (tag) {
+                    var val = v.tags[tag];
+                    if (tag.indexOf('medidas_') === 0) {
+                        if (val !== '' && val != null) parts.push(prettyMeasure(tag) + ': ' + val);
+                        return;
+                    }
+                    if (typeof val !== 'string') return;
+                    var s = val.trim();
+                    if (s.charAt(0) !== '{') return;
+                    try {
+                        var obj = JSON.parse(s);
+                        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+                            Object.keys(obj).forEach(function (key) {
+                                if (obj[key] !== '' && obj[key] != null) parts.push(prettyLabel(key) + ': ' + obj[key]);
+                            });
+                        }
+                    } catch (e) { /* not JSON → ignore */ }
+                });
+                return parts;
+            }
+
+            function hasMedidas(variants) {
+                return variants.some(function (v) { return measuresOf(v).length > 0; });
             }
 
             function medidasText(prod, variants) {
@@ -235,23 +278,13 @@
                         var pv = v.pivot_valor;
                         if (pv === null || pv === undefined || seen[pv]) return;
                         seen[pv] = true;
-                        var parts = [];
-                        Object.keys(v.tags).forEach(function (tag) {
-                            if (tag.indexOf('medidas_') === 0 && v.tags[tag] !== '' && v.tags[tag] != null) {
-                                parts.push(prettyMeasure(tag) + ': ' + v.tags[tag]);
-                            }
-                        });
+                        var parts = measuresOf(v);
                         if (parts.length) {
                             lines.push('• ' + (prod.pivot_label || prod.pivot) + ' ' + pv + ' — ' + parts.join(', '));
                         }
                     });
                 } else if (variants[0]) {
-                    var v0 = variants[0];
-                    Object.keys(v0.tags).forEach(function (tag) {
-                        if (tag.indexOf('medidas_') === 0 && v0.tags[tag] !== '' && v0.tags[tag] != null) {
-                            lines.push('• ' + prettyMeasure(tag) + ': ' + v0.tags[tag]);
-                        }
-                    });
+                    measuresOf(variants[0]).forEach(function (part) { lines.push('• ' + part); });
                 }
                 if (!lines.length) return null;
                 return '📏 Medidas de ' + prod.nombre + ':\n' + lines.join('\n');
@@ -271,7 +304,10 @@
 
             function scopeImages(prod, variants) {
                 var imgs = [];
-                variants.forEach(function (v) { (v.images || []).forEach(function (u) { imgs.push(u); }); });
+                variants.forEach(function (v) {
+                    (v.images || []).forEach(function (u) { imgs.push(u); });
+                    urlsFromTags(v.tags).forEach(function (u) { imgs.push(u); });
+                });
                 if (!imgs.length) imgs = (prod.product_images || []).slice();
                 var seen = {}, out = [];
                 imgs.forEach(function (u) { if (u && !seen[u]) { seen[u] = true; out.push(u); } });

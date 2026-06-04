@@ -128,11 +128,13 @@ class MetabotInboxController extends Controller
     private function productForMenu(array $p): array
     {
         // Row 1: product-level tags. These apply to the whole product, so they are
-        // terminal (click → value). medidas_* surface via the per-scope Medidas
-        // button instead; image_N / pivot / categoria are already stripped upstream.
+        // terminal (click → value). Structured tags are NOT terminal: a JSON array
+        // value is photos (→ Fotos) and a JSON object value is measurements
+        // (→ Medidas); medidas_* and image_N / pivot / categoria are likewise not
+        // plain row-1 tags.
         $productTags = [];
         foreach ($p['tags'] as $tag => $val) {
-            if ($val === null || $val === '' || strpos($tag, 'medidas_') === 0) {
+            if ($val === null || $val === '' || strpos($tag, 'medidas_') === 0 || $this->isStructured($val)) {
                 continue;
             }
             $productTags[] = [
@@ -158,7 +160,7 @@ class MetabotInboxController extends Controller
             'pivot'          => $p['pivot'],
             'pivot_label'    => $p['pivot'] ? $this->prettyLabel($p['pivot']) : null,
             'product_tags'   => $productTags,
-            'product_images' => $p['images'],
+            'product_images' => array_values(array_unique(array_merge($p['images'], $this->urlsFromTags($p['tags'])))),
             'variants'       => $variants,
         ];
     }
@@ -169,20 +171,69 @@ class MetabotInboxController extends Controller
         return ucfirst(str_replace('_', ' ', $tag));
     }
 
+    // A tag value that is a JSON array or object (e.g. images list / measures map)
+    // rather than a plain scalar.
+    private function isStructured($val): bool
+    {
+        if (!is_string($val)) {
+            return false;
+        }
+        $s = ltrim($val);
+        if ($s === '' || ($s[0] !== '[' && $s[0] !== '{')) {
+            return false;
+        }
+        $decoded = json_decode($s, true);
+
+        return is_array($decoded);
+    }
+
+    /**
+     * Photo URLs carried inside tags whose value is a JSON array of URLs
+     * (the `images` tag convention), in addition to image_N tags handled upstream.
+     *
+     * @return array<string>
+     */
+    private function urlsFromTags(array $tags): array
+    {
+        $urls = [];
+        foreach ($tags as $val) {
+            if (!is_string($val)) {
+                continue;
+            }
+            $s = ltrim($val);
+            if ($s === '' || $s[0] !== '[') {
+                continue;
+            }
+            $decoded = json_decode($s, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            foreach ($decoded as $u) {
+                if (is_string($u) && preg_match('#^https?://#', $u)) {
+                    $urls[] = $u;
+                }
+            }
+        }
+
+        return $urls;
+    }
+
     /**
      * All photo URLs that legitimately belong to a product (product-level first,
      * then per variant), deduped and capped at 10. Used as the allow-list when the
-     * staff sends scoped photos.
+     * staff sends scoped photos. Covers both image_N tags and the `images` JSON
+     * array convention.
      *
      * @return array<string>
      */
     private function imagesFor(array $p): array
     {
-        $images = $p['images'];
+        $images = array_merge($p['images'], $this->urlsFromTags($p['tags']));
         foreach ($p['variants'] as $v) {
             foreach ($v['images'] as $u) {
                 $images[] = $u;
             }
+            $images = array_merge($images, $this->urlsFromTags($v['tags']));
         }
 
         return array_slice(array_values(array_unique(array_filter($images))), 0, 10);
