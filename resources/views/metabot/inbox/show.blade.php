@@ -165,21 +165,44 @@
                 return out;
             }
 
+            // A value is "plain" if it's a simple scalar — not a JSON array/object.
+            // Tags carrying structured values (e.g. a list) aren't drillable groups.
+            function isPlain(val) {
+                if (val === null || val === undefined) return false;
+                if (typeof val !== 'string') return typeof val !== 'object';
+                var s = val.trim();
+                if (s === '') return false;
+                if (s.charAt(0) === '[' || s.charAt(0) === '{') {
+                    try {
+                        var parsed = JSON.parse(s);
+                        if (parsed && typeof parsed === 'object') return false; // array or object
+                    } catch (e) { /* not valid JSON → it's plain text */ }
+                }
+                return true;
+            }
+
             // Tag names present across the scope, minus those already chosen and the
             // medidas_* family (handled by one Medidas button). image_* never reach
-            // here — the catalog strips them, and photos get their own button.
+            // here — the catalog strips them, and photos get their own button. Only
+            // tags whose values are plain text become drillable groups.
             function scanTags(variants) {
-                var seen = {}, out = [];
+                var seen = {}, names = [];
                 variants.forEach(function (v) {
                     Object.keys(v.tags).forEach(function (tag) {
                         if (seen[tag]) return;
                         if (tag.indexOf('medidas_') === 0) return;
                         if (state.filters.some(function (f) { return f.tag === tag; })) return;
-                        seen[tag] = true; out.push(tag);
+                        seen[tag] = true; names.push(tag);
                     });
                 });
-                out.sort();
-                return out;
+                names = names.filter(function (tag) {
+                    return variants.every(function (v) {
+                        var val = v.tags[tag];
+                        return val === undefined || val === null || val === '' || isPlain(val);
+                    });
+                });
+                names.sort();
+                return names;
             }
 
             function prettyLabel(tag) {
