@@ -275,12 +275,9 @@ class MetabotInboxController extends Controller
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Este producto no tiene fotos.');
         }
 
-        $captions = [];
-        foreach ($images as $url) {
-            $captions[$url] = $p['nombre'];
-        }
-
-        return $this->dispatchPhotos($whatsapp, $phone, $images, $captions);
+        // Single product: no caption — the customer already knows which product.
+        // (The category sender captions each image with its product name.)
+        return $this->dispatchPhotos($whatsapp, $phone, $images, []);
     }
 
     /**
