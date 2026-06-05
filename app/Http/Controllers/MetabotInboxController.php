@@ -219,10 +219,11 @@ class MetabotInboxController extends Controller
     }
 
     /**
-     * All photo URLs that legitimately belong to a product (product-level first,
-     * then per variant), deduped and capped at 10. Used as the allow-list when the
-     * staff sends scoped photos. Covers both image_N tags and the `images` JSON
-     * array convention.
+     * Every photo URL that legitimately belongs to a product (product-level plus
+     * all variants), deduped. Used as the allow-list when the staff sends photos —
+     * it is NOT capped, because the staff may have narrowed to a variant whose
+     * photos sort past any cap; the actual send is bounded at the call site.
+     * Covers both image_N tags and the `images` JSON array convention.
      *
      * @return array<string>
      */
@@ -236,7 +237,7 @@ class MetabotInboxController extends Controller
             $images = array_merge($images, $this->urlsFromTags($v['tags']));
         }
 
-        return array_slice(array_values(array_unique(array_filter($images))), 0, 10);
+        return array_values(array_unique(array_filter($images)));
     }
 
     /**
@@ -256,12 +257,20 @@ class MetabotInboxController extends Controller
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Producto no encontrado.');
         }
 
-        // Only ever send URLs that belong to this product's catalog photos. When the
-        // staff narrowed to a variant the client posts that scoped subset; otherwise
-        // fall back to all of the product's photos.
-        $allowed   = $this->imagesFor($p);
+        // Only ever send URLs that belong to this product's catalog photos. Keep the
+        // staff's selection and order (the client posts the scoped/edited subset);
+        // fall back to all of the product's photos if nothing was posted. The send
+        // is capped here, not in the allow-list, so a scoped photo can't be dropped.
+        $allowed   = array_flip($this->imagesFor($p));
         $requested = $request->input('images', []);
-        $images    = !empty($requested) ? array_values(array_intersect($allowed, $requested)) : $allowed;
+        if (!empty($requested)) {
+            $images = array_values(array_filter($requested, function ($u) use ($allowed) {
+                return is_string($u) && isset($allowed[$u]);
+            }));
+        } else {
+            $images = array_keys($allowed);
+        }
+        $images = array_slice($images, 0, 10);
         if (empty($images)) {
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Este producto no tiene fotos.');
         }
