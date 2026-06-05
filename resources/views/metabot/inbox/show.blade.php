@@ -10,7 +10,7 @@
     </x-slot>
 
     <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-2 lg:px-4">
+        <div class="mx-auto sm:px-2 lg:px-4" style="max-width:57.6rem;">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
                     @if (session('error'))
@@ -20,7 +20,7 @@
                         <div class="mb-4 text-green-600">{{ session('success') }}</div>
                     @endif
 
-                    <div id="thread" class="max-h-96 overflow-y-auto border border-gray-100 rounded-md p-3 bg-gray-50">
+                    <div id="thread" class="overflow-y-auto border border-gray-100 rounded-md p-3 bg-gray-50" style="max-height:28.8rem;">
                         @include('metabot.inbox._thread')
                     </div>
 
@@ -28,7 +28,7 @@
                     <div id="wa-window-banner" class="mt-3 px-3 py-2 rounded-md text-sm" style="display:none;"></div>
 
                     @if(!empty($quickMenu))
-                        <div class="mt-4 pt-4 border-t border-gray-200">
+                        <div class="mt-4 pt-4 border-t border-gray-200" data-wa-free>
                             <div class="mb-2">
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
                             </div>
@@ -38,7 +38,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="mt-4">
+                    <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="mt-4" data-wa-free>
                         @csrf
                         <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
                         <div class="mt-2 flex justify-between items-center">
@@ -47,7 +47,7 @@
                         </div>
                     </form>
 
-                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="mt-4 pt-4 border-t border-gray-200">
+                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="mt-4 pt-4 border-t border-gray-200" data-wa-free>
                         @csrf
                         <label for="image" class="block text-sm font-medium text-gray-700">Enviar una imagen</label>
                         <input type="file" name="image" id="image" accept="image/jpeg,image/png" required class="mt-1 block w-full text-sm text-gray-600">
@@ -59,7 +59,7 @@
                     </form>
 
                     @if($templates->isNotEmpty())
-                        <div class="mt-6 pt-4 border-t border-gray-200">
+                        <div class="mt-6 pt-4 border-t border-gray-200" id="wa-template" style="display:none;">
                             <label for="template_id" class="block text-sm font-medium text-gray-700">Reabrir conversación con una plantilla</label>
                             <p class="text-xs text-gray-400 mb-2">Úsala cuando ya pasaron 24h del último mensaje del cliente. Cada envío tiene costo (mensaje de plantilla de Meta).</p>
                             <form method="POST" action="{{ route('metabot.inbox.template', ['phone' => $phone]) }}" onsubmit="return confirm('Se enviará una plantilla pagada para reabrir la conversación. ¿Continuar?');">
@@ -115,15 +115,14 @@
             var total = Math.floor(ms / 60000), h = Math.floor(total / 60), m = total % 60;
             return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
         }
-        function applyWindowDisabled() {
-            var buttons = [replySend, imageSend];
-            document.querySelectorAll('[data-wa-send]').forEach(function (b) { buttons.push(b); });
-            buttons.forEach(function (b) {
-                if (!b) return;
-                b.disabled = !WA.open;
-                b.style.opacity = WA.open ? '' : '0.5';
-                b.style.cursor = WA.open ? '' : 'not-allowed';
+        // Inside the window: show the free-form controls, hide templates.
+        // Outside: hide the free-form controls, show templates (the only way in).
+        function applyWindow() {
+            document.querySelectorAll('[data-wa-free]').forEach(function (el) {
+                el.style.display = WA.open ? '' : 'none';
             });
+            var tpl = document.getElementById('wa-template');
+            if (tpl) tpl.style.display = WA.open ? 'none' : '';
         }
         function updateWindow() {
             var el = document.getElementById('wa-window-data');
@@ -146,7 +145,7 @@
                     setBanner('#ecfdf5', '#065f46', '✅ Ventana de 24h abierta — quedan ' + fmtRemaining(remaining) + ' (vence ' + when + ').');
                 }
             }
-            applyWindowDisabled();
+            applyWindow();
         }
 
         scrollBottom();
