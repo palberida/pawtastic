@@ -315,38 +315,64 @@
             }
 
             function showPhotos(prod, images) {
-                qrPhotos.innerHTML = '';
-                var note = document.createElement('p');
-                note.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:6px;';
-                note.textContent = 'Se enviarán estas fotos al cliente:';
-                qrPhotos.appendChild(note);
+                // Mutable selection so the staff can drop photos before sending.
+                var selected = images.slice();
 
-                var gallery = document.createElement('div');
-                gallery.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;';
-                images.forEach(function (url) {
-                    var img = document.createElement('img');
-                    img.src = url;
-                    img.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;';
-                    gallery.appendChild(img);
-                });
-                qrPhotos.appendChild(gallery);
+                function draw() {
+                    qrPhotos.innerHTML = '';
 
-                var form = document.createElement('form');
-                form.method = 'POST';
-                form.action = PHOTOS_URL;
-                var html = '<input type="hidden" name="_token" value="' + CSRF + '">' +
-                    '<input type="hidden" name="product_id" value="' + prod.id + '">';
-                images.forEach(function (url) {
-                    html += '<input type="hidden" name="images[]" value="' + url.replace(/"/g, '&quot;') + '">';
-                });
-                form.innerHTML = html;
-                var send = document.createElement('button');
-                send.type = 'submit';
-                send.textContent = 'Enviar ' + images.length + ' foto(s)';
-                send.style.cssText = 'font-size:13px;padding:6px 14px;border-radius:6px;border:none;background:#f59e0b;color:#fff;cursor:pointer;';
-                form.appendChild(send);
-                qrPhotos.appendChild(form);
+                    var note = document.createElement('p');
+                    note.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:6px;';
+                    note.textContent = selected.length
+                        ? 'Se enviarán estas fotos al cliente (toca la ✕ para quitar):'
+                        : 'No quedan fotos seleccionadas.';
+                    qrPhotos.appendChild(note);
 
+                    var gallery = document.createElement('div');
+                    gallery.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;';
+                    selected.forEach(function (url, idx) {
+                        var cell = document.createElement('div');
+                        cell.style.cssText = 'position:relative;width:64px;height:64px;';
+
+                        var img = document.createElement('img');
+                        img.src = url;
+                        img.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;';
+                        cell.appendChild(img);
+
+                        var rm = document.createElement('button');
+                        rm.type = 'button';
+                        rm.textContent = '✕';
+                        rm.title = 'Quitar foto';
+                        rm.style.cssText = 'position:absolute;top:-6px;right:-6px;width:18px;height:18px;line-height:16px;' +
+                            'padding:0;border-radius:9999px;border:1px solid #fff;background:#dc2626;color:#fff;' +
+                            'font-size:11px;cursor:pointer;';
+                        rm.addEventListener('click', function () { selected.splice(idx, 1); draw(); });
+                        cell.appendChild(rm);
+
+                        gallery.appendChild(cell);
+                    });
+                    qrPhotos.appendChild(gallery);
+
+                    if (!selected.length) return;
+
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = PHOTOS_URL;
+                    var html = '<input type="hidden" name="_token" value="' + CSRF + '">' +
+                        '<input type="hidden" name="product_id" value="' + prod.id + '">';
+                    selected.forEach(function (url) {
+                        html += '<input type="hidden" name="images[]" value="' + url.replace(/"/g, '&quot;') + '">';
+                    });
+                    form.innerHTML = html;
+                    var send = document.createElement('button');
+                    send.type = 'submit';
+                    send.textContent = 'Enviar ' + selected.length + ' foto(s)';
+                    send.style.cssText = 'font-size:13px;padding:6px 14px;border-radius:6px;border:none;background:#f59e0b;color:#fff;cursor:pointer;';
+                    form.appendChild(send);
+                    qrPhotos.appendChild(form);
+                }
+
+                draw();
                 qrPhotos.style.display = '';
                 qrPhotos.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
