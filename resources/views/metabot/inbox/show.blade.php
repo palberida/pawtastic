@@ -227,7 +227,7 @@
                     img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
                     thumb.appendChild(img);
                 } else {
-                    thumb.textContent = '🏷️';
+                    thumb.textContent = opts.icon || '🏷️';
                 }
                 b.appendChild(thumb);
                 var span = document.createElement('span');
@@ -517,7 +517,7 @@
                     var t = document.createElement('button');
                     t.type = 'button';
                     t.textContent = g.categoria + ' (' + g.products.length + ')';
-                    t.style.cssText = 'font-size:15px;padding:10px 16px;margin-bottom:-1px;background:' +
+                    t.style.cssText = 'font-size:13px;padding:10px 16px;margin-bottom:-1px;background:' +
                         (active ? '#eef2ff' : 'none') + ';border:none;border-top-left-radius:8px;border-top-right-radius:8px;' +
                         'border-bottom:3px solid ' + (active ? '#3730a3' : 'transparent') + ';' +
                         'color:' + (active ? '#3730a3' : '#6b7280') + ';font-weight:' + (active ? '700' : '500') + ';cursor:pointer;';
@@ -561,8 +561,8 @@
                     if (u) covers.push(u);
                 });
                 if (covers.length) {
-                    row.appendChild(pill('📷 Fotos de la categoría (' + covers.length + ')', {
-                        accent: '#fef3c7', color: '#92400e',
+                    row.appendChild(productCard('Fotos categoría (' + covers.length + ')', {
+                        icon: '📷',
                         onClick: function () {
                             showPhotos(covers, PHOTOS_CAT_URL, pids.map(function (id) { return { name: 'product_ids[]', value: id }; }));
                         }
