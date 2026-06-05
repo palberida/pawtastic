@@ -63,17 +63,6 @@
                         </div>
                     </form>
 
-                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="mt-4 pt-4 border-t border-gray-200" data-wa-free>
-                        @csrf
-                        <label for="image" class="block text-sm font-medium text-gray-700">Enviar una imagen</label>
-                        <input type="file" name="image" id="image" accept="image/jpeg,image/png" required class="mt-1 block w-full text-sm text-gray-600">
-                        <input type="text" name="caption" maxlength="1024" placeholder="Descripción (opcional)" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <div class="mt-2 flex justify-between items-center">
-                            <span class="text-xs text-gray-400">JPG o PNG, máx 5MB. Solo dentro de la ventana de 24h.</span>
-                            <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar imagen</button>
-                        </div>
-                    </form>
-
                     @if($templates->isNotEmpty())
                         <div class="mt-6 pt-4 border-t border-gray-200" id="wa-template" style="display:none;">
                             <label for="template_id" class="block text-sm font-medium text-gray-700">Reabrir conversación con una plantilla</label>
@@ -96,9 +85,9 @@
             </div>
                 </div>{{-- /chat column (#chat-main) --}}
 
-                {{-- Right column: quick replies + photos --}}
-                @if(!empty($quickMenu))
-                    <aside id="chat-aside">
+                {{-- Right column: quick replies + photos + device upload --}}
+                <aside id="chat-aside">
+                    @if(!empty($quickMenu))
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
                             <div class="mb-2">
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
@@ -107,8 +96,19 @@
                             <div id="qr-buttons"></div>
                             <div id="qr-photos" style="display:none;" class="mt-3"></div>
                         </div>
-                    </aside>
-                @endif
+                    @endif
+
+                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mt-4" data-wa-free>
+                        @csrf
+                        <label for="images" class="block text-sm font-medium text-gray-700">Enviar imágenes</label>
+                        <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="mt-1 block w-full text-sm text-gray-600">
+                        <input type="text" name="caption" maxlength="1024" placeholder="Descripción (opcional, va en la primera)" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <div class="mt-2 flex justify-between items-center">
+                            <span class="text-xs text-gray-400">JPG o PNG, máx 5MB c/u, hasta 10. Solo dentro de la ventana de 24h.</span>
+                            <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
+                        </div>
+                    </form>
+                </aside>
             </div>{{-- /#chat-layout --}}
         </div>
     </div>
