@@ -1,9 +1,9 @@
 {{-- params: $conversations, $active (the phone of the open chat) --}}
-<div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+<div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between" style="flex:none;">
     <span class="text-sm font-semibold text-gray-700">Bandeja</span>
     <a href="{{ route('metabot.inbox.index') }}" class="text-xs text-blue-600 hover:underline">Ver todo</a>
 </div>
-<div style="max-height:calc(100vh - 11rem);overflow-y:auto;">
+<div id="chat-sidebar-list">
     @forelse ($conversations as $c)
         @php($isActive = $c->phone === $active)
         <a href="{{ route('metabot.inbox.show', ['phone' => $c->phone]) }}"

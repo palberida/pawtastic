@@ -9,25 +9,30 @@
         </div>
     </x-slot>
 
-    {{-- Inline media query (not Tailwind responsive classes) so the two-column
-         layout survives even if lg:* utilities aren't in the prod CSS build. --}}
+    {{-- Inline media query (not Tailwind responsive classes) so the 3-column
+         layout survives even if responsive utilities aren't in the prod CSS build.
+         Small screens stack: chat on top, quick replies below, bandeja hidden. --}}
     <style>
         #chat-layout { display:block; }
         #chat-sidebar { display:none; }
         #chat-main { max-width:57.6rem; }
-        @media (min-width:1024px) {
-            #chat-layout { display:flex; gap:1rem; align-items:flex-start; }
-            #chat-sidebar { display:block; width:18rem; flex:0 0 18rem; }
-            #chat-main { flex:1 1 auto; min-width:0; }
+        #chat-aside { display:block; margin-top:1rem; }
+        #chat-sidebar-card { background:#fff; height:100%; display:flex; flex-direction:column; }
+        #chat-sidebar-list { flex:1 1 auto; overflow-y:auto; min-height:0; }
+        @media (min-width:1280px) {
+            #chat-layout { display:flex; gap:1rem; align-items:stretch; }
+            #chat-sidebar { display:block; flex:0 0 17rem; align-self:stretch; }
+            #chat-main { flex:1 1 auto; min-width:0; max-width:none; }
+            #chat-aside { flex:0 0 25rem; align-self:flex-start; margin-top:0; }
         }
     </style>
 
     <div class="py-12">
-        <div class="mx-auto sm:px-2 lg:px-4" style="max-width:80rem;">
+        <div class="sm:px-2 lg:px-4">
             <div id="chat-layout">
                 {{-- Conversation sidebar: hop between chats without leaving --}}
                 <aside id="chat-sidebar">
-                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div id="chat-sidebar-card" class="overflow-hidden shadow-sm sm:rounded-lg">
                         @include('metabot.inbox._sidebar', ['conversations' => $conversations, 'active' => $phone])
                     </div>
                 </aside>
@@ -48,17 +53,6 @@
 
                     {{-- Live 24h customer-service-window indicator (filled by JS). --}}
                     <div id="wa-window-banner" class="mt-3 px-3 py-2 rounded-md text-sm" style="display:none;"></div>
-
-                    @if(!empty($quickMenu))
-                        <div class="mt-4 pt-4 border-t border-gray-200" data-wa-free>
-                            <div class="mb-2">
-                                <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
-                            </div>
-                            <div id="qr-cats" class="flex flex-wrap" style="gap:4px;border-bottom:1px solid #e5e7eb;"></div>
-                            <div id="qr-buttons"></div>
-                            <div id="qr-photos" style="display:none;" class="mt-3"></div>
-                        </div>
-                    @endif
 
                     <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="mt-4" data-wa-free>
                         @csrf
@@ -100,8 +94,22 @@
                     @endif
                 </div>
             </div>
-                </div>{{-- /chat column --}}
-            </div>{{-- /lg:flex --}}
+                </div>{{-- /chat column (#chat-main) --}}
+
+                {{-- Right column: quick replies + photos --}}
+                @if(!empty($quickMenu))
+                    <aside id="chat-aside">
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
+                            <div class="mb-2">
+                                <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
+                            </div>
+                            <div id="qr-cats" class="flex flex-wrap" style="gap:4px;border-bottom:1px solid #e5e7eb;"></div>
+                            <div id="qr-buttons"></div>
+                            <div id="qr-photos" style="display:none;" class="mt-3"></div>
+                        </div>
+                    </aside>
+                @endif
+            </div>{{-- /#chat-layout --}}
         </div>
     </div>
 
