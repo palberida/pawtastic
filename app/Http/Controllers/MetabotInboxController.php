@@ -275,9 +275,67 @@ class MetabotInboxController extends Controller
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Este producto no tiene fotos.');
         }
 
+        $captions = [];
+        foreach ($images as $url) {
+            $captions[$url] = $p['nombre'];
+        }
+
+        return $this->dispatchPhotos($whatsapp, $phone, $images, $captions);
+    }
+
+    /**
+     * Send one representative photo per product in a category (the staff tapped
+     * "Fotos de la categoría" and confirmed). The client posts the product ids it
+     * scoped and the cover image it chose per product; we validate every URL
+     * against those products' catalog photos before sending.
+     */
+    public function quickCategoryPhotos(Request $request, WhatsAppClient $whatsapp, $phone)
+    {
+        $request->validate([
+            'product_ids'   => ['required', 'array'],
+            'product_ids.*' => ['integer'],
+            'images'        => ['required', 'array'],
+            'images.*'      => ['string'],
+        ]);
+
+        $products = app(MetabotCatalog::class)->products($request->input('product_ids', []));
+        if (empty($products)) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'Categoría no encontrada.');
+        }
+
+        // Allow-list = every catalog photo across the posted products, mapped back to
+        // the product name so each image keeps a sensible caption.
+        $captions = [];
+        foreach ($products as $p) {
+            foreach ($this->imagesFor($p) as $url) {
+                if (!isset($captions[$url])) {
+                    $captions[$url] = $p['nombre'];
+                }
+            }
+        }
+
+        $images = array_values(array_filter($request->input('images', []), function ($u) use ($captions) {
+            return is_string($u) && isset($captions[$u]);
+        }));
+        $images = array_slice($images, 0, 30);
+        if (empty($images)) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', 'No hay fotos para enviar.');
+        }
+
+        return $this->dispatchPhotos($whatsapp, $phone, $images, $captions);
+    }
+
+    /**
+     * Send a list of (already allow-listed) image URLs to the customer, logging a
+     * human_image row with a best-effort local thumbnail per image and handing the
+     * conversation off. Shared by the single-product and category photo senders.
+     */
+    private function dispatchPhotos(WhatsAppClient $whatsapp, string $phone, array $images, array $captions)
+    {
         $sent = 0;
         foreach ($images as $url) {
-            $resp = $whatsapp->sendImageByUrl($phone, $url, $p['nombre']);
+            $caption = $captions[$url] ?? null;
+            $resp = $whatsapp->sendImageByUrl($phone, $url, $caption);
             if (($resp['status'] ?? 0) !== 200 || !data_get($resp, 'body.messages.0.id')) {
                 continue;
             }
@@ -290,7 +348,7 @@ class MetabotInboxController extends Controller
                     $mediaPath = $whatsapp->putMedia($bin->body(), $bin->header('Content-Type'));
                 }
             } catch (\Throwable $e) {
-                Log::warning('metabot: quickPhotos thumbnail fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
+                Log::warning('metabot: dispatchPhotos thumbnail fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
             }
 
             DB::table('metabot_events')->insert([
@@ -299,7 +357,7 @@ class MetabotInboxController extends Controller
                 'from_phone'    => null,
                 'to_phone'      => $phone,
                 'kind'          => 'human_image',
-                'body'          => '[imagen] ' . $p['nombre'],
+                'body'          => '[imagen]' . ($caption ? ' ' . $caption : ''),
                 'media_path'    => $mediaPath,
                 'payload'       => json_encode($resp, JSON_UNESCAPED_UNICODE),
                 'created_at'    => now(),

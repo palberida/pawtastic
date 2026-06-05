@@ -111,7 +111,8 @@
         // into one "Medidas", image_* into one "Fotos"; both are scope-aware.
         var MENU       = @json($quickMenu ?? []);
         var CSRF       = "{{ csrf_token() }}";
-        var PHOTOS_URL = "{{ route('metabot.inbox.quickphotos', ['phone' => $phone]) }}";
+        var PHOTOS_URL     = "{{ route('metabot.inbox.quickphotos', ['phone' => $phone]) }}";
+        var PHOTOS_CAT_URL = "{{ route('metabot.inbox.quickcatphotos', ['phone' => $phone]) }}";
         var qrButtons  = document.getElementById('qr-buttons');
         var qrBack     = document.getElementById('qr-back');
         var qrCrumb    = document.getElementById('qr-crumb');
@@ -314,7 +315,21 @@
                 return out.slice(0, 10);
             }
 
-            function showPhotos(prod, images) {
+            // One representative photo for a product: product-level first, else the
+            // first variant that has one (image_N or images-array tag).
+            function coverImage(prod) {
+                if (prod.product_images && prod.product_images.length) return prod.product_images[0];
+                for (var i = 0; i < prod.variants.length; i++) {
+                    var v = prod.variants[i];
+                    var imgs = (v.images || []).concat(urlsFromTags(v.tags));
+                    if (imgs.length) return imgs[0];
+                }
+                return null;
+            }
+
+            // images: URLs to preview; action: the POST endpoint; extraFields: extra
+            // hidden inputs (e.g. product_id or product_ids[]) the endpoint needs.
+            function showPhotos(images, action, extraFields) {
                 // Mutable selection so the staff can drop photos before sending.
                 var selected = images.slice();
 
@@ -357,9 +372,11 @@
 
                     var form = document.createElement('form');
                     form.method = 'POST';
-                    form.action = PHOTOS_URL;
-                    var html = '<input type="hidden" name="_token" value="' + CSRF + '">' +
-                        '<input type="hidden" name="product_id" value="' + prod.id + '">';
+                    form.action = action;
+                    var html = '<input type="hidden" name="_token" value="' + CSRF + '">';
+                    (extraFields || []).forEach(function (f) {
+                        html += '<input type="hidden" name="' + f.name + '" value="' + String(f.value).replace(/"/g, '&quot;') + '">';
+                    });
                     selected.forEach(function (url) {
                         html += '<input type="hidden" name="images[]" value="' + url.replace(/"/g, '&quot;') + '">';
                     });
@@ -405,6 +422,23 @@
                     qrBack.style.display = '';
                     var g = MENU[state.cat];
                     qrCrumb.textContent = g.categoria + ' · elige un producto.';
+
+                    // One cover photo per product in the category (first one found).
+                    var covers = [], pids = [];
+                    g.products.forEach(function (p) {
+                        pids.push(p.id);
+                        var u = coverImage(p);
+                        if (u) covers.push(u);
+                    });
+                    if (covers.length) {
+                        qrButtons.appendChild(pill('📷 Fotos de la categoría (' + covers.length + ')', {
+                            accent: '#fef3c7', color: '#92400e',
+                            onClick: function () {
+                                showPhotos(covers, PHOTOS_CAT_URL, pids.map(function (id) { return { name: 'product_ids[]', value: id }; }));
+                            }
+                        }));
+                    }
+
                     g.products.forEach(function (p, j) {
                         qrButtons.appendChild(pill(p.nombre, {
                             onClick: function () { state.level = 2; state.prod = j; state.filters = []; state.pendingTag = null; render(); }
@@ -485,7 +519,7 @@
                 if (imgs.length) {
                     qrButtons.appendChild(pill('📷 Fotos', {
                         accent: '#fef3c7', color: '#92400e',
-                        onClick: function () { showPhotos(prod, imgs); }
+                        onClick: function () { showPhotos(imgs, PHOTOS_URL, [{ name: 'product_id', value: prod.id }]); }
                     }));
                 }
             }
