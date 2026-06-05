@@ -9,17 +9,30 @@
         </div>
     </x-slot>
 
+    {{-- Inline media query (not Tailwind responsive classes) so the two-column
+         layout survives even if lg:* utilities aren't in the prod CSS build. --}}
+    <style>
+        #chat-layout { display:block; }
+        #chat-sidebar { display:none; }
+        #chat-main { max-width:57.6rem; }
+        @media (min-width:1024px) {
+            #chat-layout { display:flex; gap:1rem; align-items:flex-start; }
+            #chat-sidebar { display:block; width:18rem; flex:0 0 18rem; }
+            #chat-main { flex:1 1 auto; min-width:0; }
+        }
+    </style>
+
     <div class="py-12">
         <div class="mx-auto sm:px-2 lg:px-4" style="max-width:80rem;">
-            <div class="lg:flex" style="gap:1rem;align-items:flex-start;">
+            <div id="chat-layout">
                 {{-- Conversation sidebar: hop between chats without leaving --}}
-                <aside class="hidden lg:block" style="width:18rem;flex:none;">
+                <aside id="chat-sidebar">
                     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         @include('metabot.inbox._sidebar', ['conversations' => $conversations, 'active' => $phone])
                     </div>
                 </aside>
 
-                <div class="min-w-0" style="flex:1;max-width:57.6rem;">
+                <div id="chat-main">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
                     @if (session('error'))
