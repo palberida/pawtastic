@@ -10,7 +10,16 @@
     </x-slot>
 
     <div class="py-12">
-        <div class="mx-auto sm:px-2 lg:px-4" style="max-width:57.6rem;">
+        <div class="mx-auto sm:px-2 lg:px-4" style="max-width:80rem;">
+            <div class="lg:flex" style="gap:1rem;align-items:flex-start;">
+                {{-- Conversation sidebar: hop between chats without leaving --}}
+                <aside class="hidden lg:block" style="width:18rem;flex:none;">
+                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        @include('metabot.inbox._sidebar', ['conversations' => $conversations, 'active' => $phone])
+                    </div>
+                </aside>
+
+                <div class="min-w-0" style="flex:1;max-width:57.6rem;">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
                     @if (session('error'))
@@ -78,6 +87,8 @@
                     @endif
                 </div>
             </div>
+                </div>{{-- /chat column --}}
+            </div>{{-- /lg:flex --}}
         </div>
     </div>
 

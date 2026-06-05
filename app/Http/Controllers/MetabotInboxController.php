@@ -23,6 +23,18 @@ class MetabotInboxController extends Controller
 
     public function index()
     {
+        $conversations = $this->conversationList();
+        $pendingCount  = $conversations->where('pending', true)->count();
+
+        return view('metabot.inbox.index', compact('conversations', 'pendingCount'));
+    }
+
+    /**
+     * The inbox conversation list (newest/pending first). Shared by the bandeja
+     * index and the in-chat sidebar.
+     */
+    private function conversationList()
+    {
         // A conversation is keyed by the customer phone, which appears as
         // from_phone on inbound rows. Outbound rows carry it as to_phone.
         $phones = DB::table('metabot_events')
@@ -34,7 +46,7 @@ class MetabotInboxController extends Controller
         $statuses = MetabotConversation::pluck('status', 'phone');
         $names    = DB::table('metabot_contacts')->pluck('name', 'phone');
 
-        $conversations = $phones->map(function ($phone) use ($statuses, $names) {
+        return $phones->map(function ($phone) use ($statuses, $names) {
             $last = DB::table('metabot_events')
                 ->where(function ($q) use ($phone) {
                     $q->where('from_phone', $phone)->orWhere('to_phone', $phone);
@@ -70,20 +82,17 @@ class MetabotInboxController extends Controller
             }
             return strcmp((string) $b->last_at, (string) $a->last_at);
         })->values();
-
-        $pendingCount = $conversations->where('pending', true)->count();
-
-        return view('metabot.inbox.index', compact('conversations', 'pendingCount'));
     }
 
     public function show($phone)
     {
-        $messages  = $this->threadFor($phone);
-        $templates = MetabotTemplate::where('status', 'active')->orderBy('label')->orderBy('name')->get();
-        $name      = DB::table('metabot_contacts')->where('phone', $phone)->value('name');
-        $quickMenu = $this->buildQuickMenu();
+        $messages      = $this->threadFor($phone);
+        $templates     = MetabotTemplate::where('status', 'active')->orderBy('label')->orderBy('name')->get();
+        $name          = DB::table('metabot_contacts')->where('phone', $phone)->value('name');
+        $quickMenu     = $this->buildQuickMenu();
+        $conversations = $this->conversationList(); // left sidebar to hop between chats
 
-        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu'));
+        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu', 'conversations'));
     }
 
     /**
