@@ -33,6 +33,7 @@
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
                                 <button type="button" id="qr-back" style="display:none;font-size:13px;color:#2563eb;background:none;border:none;cursor:pointer;">← Atrás</button>
                             </div>
+                            <div id="qr-cats" class="flex flex-wrap mb-2" style="gap:8px;"></div>
                             <p id="qr-crumb" class="text-xs text-gray-400 mb-2">Elige una categoría.</p>
                             <div id="qr-buttons" class="flex flex-wrap" style="gap:8px;"></div>
                             <div id="qr-photos" style="display:none;" class="mt-3"></div>
@@ -175,6 +176,7 @@
         var CSRF       = "{{ csrf_token() }}";
         var PHOTOS_URL     = "{{ route('metabot.inbox.quickphotos', ['phone' => $phone]) }}";
         var PHOTOS_CAT_URL = "{{ route('metabot.inbox.quickcatphotos', ['phone' => $phone]) }}";
+        var qrCats     = document.getElementById('qr-cats');
         var qrButtons  = document.getElementById('qr-buttons');
         var qrBack     = document.getElementById('qr-back');
         var qrCrumb    = document.getElementById('qr-crumb');
@@ -467,19 +469,27 @@
                 return base;
             }
 
+            // The category row stays visible at all times; the active one is filled in.
+            function renderCats() {
+                qrCats.innerHTML = '';
+                MENU.forEach(function (g, i) {
+                    var active = state.level >= 1 && state.cat === i;
+                    qrCats.appendChild(pill(g.categoria + ' (' + g.products.length + ')', {
+                        accent: active ? '#3730a3' : '#eef2ff',
+                        color: active ? '#fff' : '#3730a3',
+                        onClick: function () { state.level = 1; state.cat = i; state.filters = []; state.pendingTag = null; render(); }
+                    }));
+                });
+            }
+
             function render() {
+                renderCats();
                 qrButtons.innerHTML = '';
                 clearPhotos();
 
                 if (state.level === 0) {
                     qrBack.style.display = 'none';
                     qrCrumb.textContent = 'Elige una categoría.';
-                    MENU.forEach(function (g, i) {
-                        qrButtons.appendChild(pill(g.categoria + ' (' + g.products.length + ')', {
-                            accent: '#eef2ff', color: '#3730a3',
-                            onClick: function () { state.level = 1; state.cat = i; render(); }
-                        }));
-                    });
                     return;
                 }
 
