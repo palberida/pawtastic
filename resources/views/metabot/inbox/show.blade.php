@@ -29,9 +29,8 @@
 
                     @if(!empty($quickMenu))
                         <div class="mt-4 pt-4 border-t border-gray-200">
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="mb-2">
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
-                                <button type="button" id="qr-back" style="display:none;font-size:13px;color:#2563eb;background:none;border:none;cursor:pointer;">← Atrás</button>
                             </div>
                             <div>
                                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px;">Categorías</div>
@@ -180,7 +179,6 @@
         var PHOTOS_CAT_URL = "{{ route('metabot.inbox.quickcatphotos', ['phone' => $phone]) }}";
         var qrCats     = document.getElementById('qr-cats');
         var qrButtons  = document.getElementById('qr-buttons');
-        var qrBack     = document.getElementById('qr-back');
         var qrPhotos   = document.getElementById('qr-photos');
         var replyBox   = document.getElementById('reply-body');
 
@@ -528,9 +526,24 @@
 
             // Row 3 — everything inside the product, in ONE replacing row. Shows either
             // the value choices for a tag being narrowed, or the current scan buttons.
+            function backOne() {
+                if (state.pendingTag) { state.pendingTag = null; }
+                else if (state.filters.length) { state.filters.pop(); }
+                render();
+            }
+
             function buildDetail(row) {
                 var prod = MENU[state.cat].products[state.prod];
                 var variants = inScope(prod, state.filters);
+
+                // "Atrás" only appears once the detail buttons have been replaced
+                // (a tag's values are showing, or we've narrowed at least once).
+                if (state.pendingTag || state.filters.length) {
+                    row.appendChild(pill('← Atrás', {
+                        accent: '#6b7280', color: '#fff',
+                        onClick: backOne
+                    }));
+                }
 
                 // Narrowing a multi-value tag: show its values (replaces the scan).
                 if (state.pendingTag) {
@@ -616,18 +629,7 @@
                 if (state.prod !== null) {
                     buildDetail(section(detailLabel()));
                 }
-
-                qrBack.style.display = state.cat !== null ? '' : 'none';
             }
-
-            // Back peels one level: tag values → narrowing → product → category.
-            qrBack.addEventListener('click', function () {
-                if (state.pendingTag) { state.pendingTag = null; }
-                else if (state.filters.length) { state.filters.pop(); }
-                else if (state.prod !== null) { state.prod = null; }
-                else { state.cat = null; }
-                render();
-            });
 
             render();
         }
