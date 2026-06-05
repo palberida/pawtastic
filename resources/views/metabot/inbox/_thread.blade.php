@@ -1,3 +1,11 @@
+@php
+    // Epoch (absolute) of the customer's last inbound message — drives the live
+    // 24h-window indicator. Re-emitted on every thread poll so the window resets
+    // the moment a new customer message arrives.
+    $lastInbound   = $messages->where('direction', 'in')->last();
+    $lastInboundTs = $lastInbound ? \Illuminate\Support\Carbon::parse($lastInbound->created_at)->getTimestamp() : '';
+@endphp
+<div id="wa-window-data" data-at="{{ $lastInboundTs }}" hidden></div>
 <div class="space-y-2">
     @forelse ($messages as $m)
         @php

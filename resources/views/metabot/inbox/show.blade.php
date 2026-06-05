@@ -24,6 +24,9 @@
                         @include('metabot.inbox._thread')
                     </div>
 
+                    {{-- Live 24h customer-service-window indicator (filled by JS). --}}
+                    <div id="wa-window-banner" class="mt-3 px-3 py-2 rounded-md text-sm" style="display:none;"></div>
+
                     @if(!empty($quickMenu))
                         <div class="mt-4 pt-4 border-t border-gray-200">
                             <div class="flex items-center justify-between mb-2">
@@ -41,7 +44,7 @@
                         <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
                         <div class="mt-2 flex justify-between items-center">
                             <span class="text-xs text-gray-400">Solo se puede responder dentro de las 24h del último mensaje del cliente.</span>
-                            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
+                            <button type="submit" id="reply-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
                         </div>
                     </form>
 
@@ -52,7 +55,7 @@
                         <input type="text" name="caption" maxlength="1024" placeholder="Descripción (opcional)" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <div class="mt-2 flex justify-between items-center">
                             <span class="text-xs text-gray-400">JPG o PNG, máx 5MB. Solo dentro de la ventana de 24h.</span>
-                            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar imagen</button>
+                            <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar imagen</button>
                         </div>
                     </form>
 
@@ -87,11 +90,70 @@
         function poll() {
             fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(function (r) { return r.text(); })
-                .then(function (html) { thread.innerHTML = html; scrollBottom(); })
+                .then(function (html) { thread.innerHTML = html; scrollBottom(); updateWindow(); })
                 .catch(function () {});
         }
+
+        // --- 24h customer-service window ---
+        // WhatsApp only delivers free-form messages within 24h of the customer's
+        // last inbound. WA.open gates the free-form send controls; templates are the
+        // only way to message outside it. The window resets whenever a new inbound
+        // arrives (the poll re-emits #wa-window-data and we re-read it).
+        var WINDOW_MS = 24 * 60 * 60 * 1000;
+        var WA        = { open: true };
+        var banner    = document.getElementById('wa-window-banner');
+        var replySend = document.getElementById('reply-send');
+        var imageSend = document.getElementById('image-send');
+
+        function setBanner(bg, color, text) {
+            if (!banner) return;
+            banner.style.display = '';
+            banner.style.background = bg;
+            banner.style.color = color;
+            banner.textContent = text;
+        }
+        function fmtRemaining(ms) {
+            var total = Math.floor(ms / 60000), h = Math.floor(total / 60), m = total % 60;
+            return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+        }
+        function applyWindowDisabled() {
+            var buttons = [replySend, imageSend];
+            document.querySelectorAll('[data-wa-send]').forEach(function (b) { buttons.push(b); });
+            buttons.forEach(function (b) {
+                if (!b) return;
+                b.disabled = !WA.open;
+                b.style.opacity = WA.open ? '' : '0.5';
+                b.style.cursor = WA.open ? '' : 'not-allowed';
+            });
+        }
+        function updateWindow() {
+            var el = document.getElementById('wa-window-data');
+            var at = el ? parseInt(el.getAttribute('data-at'), 10) : NaN;
+            if (!at) {
+                WA.open = false;
+                setBanner('#fee2e2', '#991b1b', '⛔ El cliente aún no ha escrito — no puedes enviar mensajes libres. Inícialo con una plantilla.');
+            } else {
+                var expiry = at * 1000 + WINDOW_MS;
+                var remaining = expiry - Date.now();
+                var when = new Date(expiry).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                if (remaining <= 0) {
+                    WA.open = false;
+                    setBanner('#fee2e2', '#991b1b', '⛔ Ventana de 24h cerrada — los mensajes libres NO se entregarán. Reábrela con una plantilla.');
+                } else if (remaining <= 2 * WINDOW_MS / 24) { // < 2h left
+                    WA.open = true;
+                    setBanner('#fef3c7', '#92400e', '⚠ Ventana de 24h por cerrar — quedan ' + fmtRemaining(remaining) + ' (vence ' + when + ').');
+                } else {
+                    WA.open = true;
+                    setBanner('#ecfdf5', '#065f46', '✅ Ventana de 24h abierta — quedan ' + fmtRemaining(remaining) + ' (vence ' + when + ').');
+                }
+            }
+            applyWindowDisabled();
+        }
+
         scrollBottom();
+        updateWindow();
         setInterval(poll, 7000);
+        setInterval(updateWindow, 30000); // tick the countdown / flip to closed at expiry
 
         var sel = document.getElementById('template_id');
         var prev = document.getElementById('template_preview');
@@ -383,8 +445,11 @@
                     form.innerHTML = html;
                     var send = document.createElement('button');
                     send.type = 'submit';
+                    send.setAttribute('data-wa-send', '1');
                     send.textContent = 'Enviar ' + selected.length + ' foto(s)';
                     send.style.cssText = 'font-size:13px;padding:6px 14px;border-radius:6px;border:none;background:#f59e0b;color:#fff;cursor:pointer;';
+                    send.disabled = !WA.open;
+                    if (!WA.open) { send.style.opacity = '0.5'; send.style.cursor = 'not-allowed'; }
                     form.appendChild(send);
                     qrPhotos.appendChild(form);
                 }
