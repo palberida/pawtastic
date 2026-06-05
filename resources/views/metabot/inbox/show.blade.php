@@ -184,9 +184,13 @@
         var replyBox   = document.getElementById('reply-body');
 
         if (qrButtons) {
-            // filters: chosen {tag,value} pairs. pendingTag: a multi-value tag whose
-            // values we're currently offering.
-            var state = { level: 0, cat: null, prod: null, filters: [], pendingTag: null };
+            // Cascading panels shown below the always-visible category row. Each panel
+            // is one level; clicking an item drops the panels below it and (when the
+            // item drills deeper) appends the next one. cat is the active category.
+            //   {type:'products', cat}
+            //   {type:'scan',     cat, prod, filters:[{tag,value}], selected}
+            //   {type:'values',   cat, prod, filters, tag, selected}
+            var state = { cat: null, panels: [] };
 
             function pill(label, opts) {
                 opts = opts || {};
@@ -212,11 +216,9 @@
             }
 
             // --- helpers over variant data ---
-            function curProduct() { return MENU[state.cat].products[state.prod]; }
-
-            function inScope(prod) {
+            function inScope(prod, filters) {
                 return prod.variants.filter(function (v) {
-                    return state.filters.every(function (f) { return String(v.tags[f.tag]) === String(f.value); });
+                    return (filters || []).every(function (f) { return String(v.tags[f.tag]) === String(f.value); });
                 });
             }
 
@@ -250,13 +252,13 @@
             // medidas_* family (handled by one Medidas button). image_* never reach
             // here — the catalog strips them, and photos get their own button. Only
             // tags whose values are plain text become drillable groups.
-            function scanTags(variants) {
+            function scanTags(variants, filters) {
                 var seen = {}, names = [];
                 variants.forEach(function (v) {
                     Object.keys(v.tags).forEach(function (tag) {
                         if (seen[tag]) return;
                         if (tag.indexOf('medidas_') === 0) return;
-                        if (state.filters.some(function (f) { return f.tag === tag; })) return;
+                        if ((filters || []).some(function (f) { return f.tag === tag; })) return;
                         seen[tag] = true; names.push(tag);
                     });
                 });
@@ -461,42 +463,46 @@
                 qrPhotos.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
 
-            function crumbBase(prod) {
-                var base = prod.nombre;
-                if (state.filters.length) {
-                    base += ' · ' + state.filters.map(function (f) { return f.value; }).join(' · ');
-                }
-                return base;
-            }
-
             // The category row stays visible at all times; the active one is filled in.
             function renderCats() {
                 qrCats.innerHTML = '';
                 MENU.forEach(function (g, i) {
-                    var active = state.level >= 1 && state.cat === i;
+                    var active = state.cat === i;
                     qrCats.appendChild(pill(g.categoria + ' (' + g.products.length + ')', {
                         accent: active ? '#3730a3' : '#eef2ff',
                         color: active ? '#fff' : '#3730a3',
-                        onClick: function () { state.level = 1; state.cat = i; state.filters = []; state.pendingTag = null; render(); }
+                        onClick: function () { openCategory(i); }
                     }));
                 });
             }
 
-            function render() {
-                renderCats();
-                qrButtons.innerHTML = '';
-                clearPhotos();
+            // Selecting a category resets everything below it to that category's products.
+            function openCategory(i) {
+                state.cat = i;
+                state.panels = [{ type: 'products', cat: i }];
+                render();
+            }
 
-                if (state.level === 0) {
-                    qrBack.style.display = 'none';
-                    qrCrumb.textContent = 'Elige una categoría.';
-                    return;
-                }
+            // Clicking item `sel` in panel `k`: keep panels 0..k, mark the selection,
+            // drop everything below, and (when it drills deeper) append `child`.
+            function pickInPanel(k, sel, child) {
+                state.panels = state.panels.slice(0, k + 1);
+                state.panels[k].selected = sel;
+                if (child) state.panels.push(child);
+                render();
+            }
 
-                if (state.level === 1) {
-                    qrBack.style.display = '';
-                    var g = MENU[state.cat];
-                    qrCrumb.textContent = g.categoria + ' · elige un producto.';
+            function newRow() {
+                var d = document.createElement('div');
+                d.className = 'flex flex-wrap';
+                d.style.cssText = 'gap:8px;margin-bottom:6px;';
+                return d;
+            }
+
+            // Render one panel's buttons into `row`. `k` is its index in state.panels.
+            function buildPanel(panel, k, row) {
+                if (panel.type === 'products') {
+                    var g = MENU[panel.cat];
 
                     // One cover photo per product in the category (first one found).
                     var covers = [], pids = [];
@@ -506,7 +512,7 @@
                         if (u) covers.push(u);
                     });
                     if (covers.length) {
-                        qrButtons.appendChild(pill('📷 Fotos de la categoría (' + covers.length + ')', {
+                        row.appendChild(pill('📷 Fotos de la categoría (' + covers.length + ')', {
                             accent: '#fef3c7', color: '#92400e',
                             onClick: function () {
                                 showPhotos(covers, PHOTOS_CAT_URL, pids.map(function (id) { return { name: 'product_ids[]', value: id }; }));
@@ -515,56 +521,62 @@
                     }
 
                     g.products.forEach(function (p, j) {
-                        qrButtons.appendChild(pill(p.nombre, {
-                            onClick: function () { state.level = 2; state.prod = j; state.filters = []; state.pendingTag = null; render(); }
+                        var active = panel.selected === j;
+                        row.appendChild(pill(p.nombre, {
+                            accent: active ? '#374151' : '#fff', color: active ? '#fff' : '#374151',
+                            onClick: function () { pickInPanel(k, j, { type: 'scan', cat: panel.cat, prod: j, filters: [] }); }
                         }));
                     });
                     return;
                 }
 
-                // level 2 — the tag-narrowing drill
-                qrBack.style.display = '';
-                var prod = curProduct();
-                var variants = inScope(prod);
-
-                // Sub-view: offering the values of a multi-value tag.
-                if (state.pendingTag) {
-                    var tag = state.pendingTag;
-                    qrCrumb.textContent = crumbBase(prod) + ' · elige ' + prettyLabel(tag);
-                    distinctValues(variants, tag).forEach(function (val) {
-                        qrButtons.appendChild(pill(val, {
-                            accent: '#f5f3ff', color: '#5b21b6',
-                            onClick: function () { state.filters.push({ tag: tag, value: val }); state.pendingTag = null; render(); }
+                if (panel.type === 'values') {
+                    var prodV = MENU[panel.cat].products[panel.prod];
+                    var varsV = inScope(prodV, panel.filters);
+                    distinctValues(varsV, panel.tag).forEach(function (val) {
+                        var active = panel.selected === val;
+                        row.appendChild(pill(val, {
+                            accent: active ? '#5b21b6' : '#f5f3ff', color: active ? '#fff' : '#5b21b6',
+                            onClick: function () {
+                                pickInPanel(k, val, { type: 'scan', cat: panel.cat, prod: panel.prod, filters: panel.filters.concat([{ tag: panel.tag, value: val }]) });
+                            }
                         }));
                     });
                     return;
                 }
 
-                qrCrumb.textContent = crumbBase(prod) + ' · elige qué enviar o acota.';
+                // panel.type === 'scan'
+                var prod = MENU[panel.cat].products[panel.prod];
+                var variants = inScope(prod, panel.filters);
 
-                // Row 1: product-level tags (only at the top of the drill). Terminal.
-                if (state.filters.length === 0) {
+                // Row of product-level tags only at the top of a product (no filters yet).
+                if (!panel.filters.length) {
                     prod.product_tags.forEach(function (t) {
-                        qrButtons.appendChild(pill(t.label, {
+                        row.appendChild(pill(t.label, {
                             accent: '#eef2ff', color: '#3730a3',
-                            onClick: function () { fillReply(t.text); }
+                            onClick: function () { pickInPanel(k, 'pt:' + t.label); fillReply(t.text); }
                         }));
                     });
                 }
 
-                // Scanned variant tags: one value → terminal; many → narrow deeper.
-                scanTags(variants).forEach(function (tag) {
+                // Scanned variant tags: one value → terminal prefill; many → drill deeper.
+                scanTags(variants, panel.filters).forEach(function (tag) {
                     var vals = distinctValues(variants, tag);
                     if (vals.length === 0) return;
                     if (vals.length === 1) {
                         var text = prettyLabel(tag) + ' de ' + prod.nombre + ': ' + vals[0];
-                        qrButtons.appendChild(pill(prettyLabel(tag), {
-                            accent: '#f5f3ff', color: '#5b21b6',
-                            onClick: function () { fillReply(text); }
+                        row.appendChild(pill(prettyLabel(tag), {
+                            accent: panel.selected === ('t:' + tag) ? '#5b21b6' : '#f5f3ff',
+                            color: panel.selected === ('t:' + tag) ? '#fff' : '#5b21b6',
+                            onClick: function () { pickInPanel(k, 't:' + tag); fillReply(text); }
                         }));
                     } else {
-                        qrButtons.appendChild(pill(prettyLabel(tag) + ' ▸', {
-                            onClick: function () { state.pendingTag = tag; render(); }
+                        var activeT = panel.selected === ('d:' + tag);
+                        row.appendChild(pill(prettyLabel(tag) + ' ▸', {
+                            accent: activeT ? '#374151' : '#fff', color: activeT ? '#fff' : '#374151',
+                            onClick: function () {
+                                pickInPanel(k, 'd:' + tag, { type: 'values', cat: panel.cat, prod: panel.prod, filters: panel.filters, tag: tag });
+                            }
                         }));
                     }
                 });
@@ -573,9 +585,9 @@
                 if (hasMedidas(variants)) {
                     var mt = medidasText(prod, variants);
                     if (mt) {
-                        qrButtons.appendChild(pill('📏 Medidas', {
+                        row.appendChild(pill('📏 Medidas', {
                             accent: '#eff6ff', color: '#1e40af',
-                            onClick: function () { fillReply(mt); }
+                            onClick: function () { pickInPanel(k, 'medidas'); fillReply(mt); }
                         }));
                     }
                 }
@@ -583,29 +595,42 @@
                 // Precio (scope-aware, terminal).
                 var pt = priceText(prod, variants);
                 if (pt) {
-                    qrButtons.appendChild(pill('💰 Precio', {
+                    row.appendChild(pill('💰 Precio', {
                         accent: '#ecfdf5', color: '#065f46',
-                        onClick: function () { fillReply(pt); }
+                        onClick: function () { pickInPanel(k, 'precio'); fillReply(pt); }
                     }));
                 }
 
                 // Fotos (scope-aware).
                 var imgs = scopeImages(prod, variants);
                 if (imgs.length) {
-                    qrButtons.appendChild(pill('📷 Fotos', {
+                    row.appendChild(pill('📷 Fotos', {
                         accent: '#fef3c7', color: '#92400e',
-                        onClick: function () { showPhotos(imgs, PHOTOS_URL, [{ name: 'product_id', value: prod.id }]); }
+                        onClick: function () { pickInPanel(k, 'fotos'); showPhotos(imgs, PHOTOS_URL, [{ name: 'product_id', value: prod.id }]); }
                     }));
                 }
             }
 
+            function render() {
+                renderCats();
+                qrButtons.innerHTML = '';
+                clearPhotos();
+                state.panels.forEach(function (panel, k) {
+                    var row = newRow();
+                    buildPanel(panel, k, row);
+                    qrButtons.appendChild(row);
+                });
+                qrBack.style.display = state.panels.length ? '' : 'none';
+                qrCrumb.textContent = state.panels.length ? '' : 'Elige una categoría.';
+            }
+
+            // Back collapses the deepest level (one panel at a time).
             qrBack.addEventListener('click', function () {
-                if (state.level === 2) {
-                    if (state.pendingTag) { state.pendingTag = null; render(); return; }
-                    if (state.filters.length) { state.filters.pop(); render(); return; }
-                    state.level = 1; render(); return;
-                }
-                if (state.level === 1) { state.level = 0; render(); return; }
+                if (!state.panels.length) return;
+                state.panels.pop();
+                if (state.panels.length) delete state.panels[state.panels.length - 1].selected;
+                else state.cat = null;
+                render();
             });
 
             render();
