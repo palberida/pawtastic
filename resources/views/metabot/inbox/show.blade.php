@@ -210,6 +210,35 @@
                 return b;
             }
 
+            // A square product button: cover image on top, label below.
+            function productCard(label, opts) {
+                opts = opts || {};
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:5px;width:92px;padding:7px;' +
+                    'border-radius:10px;cursor:pointer;border:2px solid ' + (opts.active ? '#374151' : '#e5e7eb') + ';' +
+                    'background:' + (opts.active ? '#f9fafb' : '#fff') + ';';
+                var thumb = document.createElement('div');
+                thumb.style.cssText = 'width:74px;height:74px;border-radius:8px;overflow:hidden;background:#f3f4f6;' +
+                    'display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:26px;';
+                if (opts.thumb) {
+                    var img = document.createElement('img');
+                    img.src = opts.thumb;
+                    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                    thumb.appendChild(img);
+                } else {
+                    thumb.textContent = '🏷️';
+                }
+                b.appendChild(thumb);
+                var span = document.createElement('span');
+                span.textContent = label;
+                span.style.cssText = 'font-size:12px;line-height:1.15;text-align:center;word-break:break-word;color:' +
+                    (opts.active ? '#111827' : '#374151') + ';';
+                b.appendChild(span);
+                if (opts.onClick) b.addEventListener('click', opts.onClick);
+                return b;
+            }
+
             // Drop the category word from a product name ("Collar Braid Colors" under
             // "Collares" → "Braid Colors"). Matches the leading word against the
             // category's first word, stripping a trailing s/es so plural ≈ singular.
@@ -488,9 +517,10 @@
                     var t = document.createElement('button');
                     t.type = 'button';
                     t.textContent = g.categoria + ' (' + g.products.length + ')';
-                    t.style.cssText = 'font-size:13px;padding:6px 10px;margin-bottom:-1px;background:none;border:none;' +
-                        'border-bottom:2px solid ' + (active ? '#3730a3' : 'transparent') + ';' +
-                        'color:' + (active ? '#3730a3' : '#6b7280') + ';font-weight:' + (active ? '600' : '400') + ';cursor:pointer;';
+                    t.style.cssText = 'font-size:15px;padding:10px 16px;margin-bottom:-1px;background:' +
+                        (active ? '#eef2ff' : 'none') + ';border:none;border-top-left-radius:8px;border-top-right-radius:8px;' +
+                        'border-bottom:3px solid ' + (active ? '#3730a3' : 'transparent') + ';' +
+                        'color:' + (active ? '#3730a3' : '#6b7280') + ';font-weight:' + (active ? '700' : '500') + ';cursor:pointer;';
                     t.addEventListener('click', function () { openCategory(i); });
                     qrCats.appendChild(t);
                 });
@@ -514,7 +544,7 @@
                 head.textContent = title;
                 var row = document.createElement('div');
                 row.className = 'flex flex-wrap';
-                row.style.cssText = 'gap:8px;';
+                row.style.cssText = 'gap:8px;align-items:flex-start;';
                 wrap.appendChild(head); wrap.appendChild(row);
                 qrButtons.appendChild(wrap);
                 return row;
@@ -539,9 +569,8 @@
                     }));
                 }
                 g.products.forEach(function (p, j) {
-                    var active = state.prod === j;
-                    row.appendChild(pill(shortName(g.categoria, p.nombre), {
-                        accent: active ? '#374151' : '#fff', color: active ? '#fff' : '#374151',
+                    row.appendChild(productCard(shortName(g.categoria, p.nombre), {
+                        active: state.prod === j,
                         thumb: coverImage(p),
                         onClick: function () { openProduct(j); }
                     }));
