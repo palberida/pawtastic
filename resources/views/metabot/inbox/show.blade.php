@@ -33,9 +33,11 @@
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
                                 <button type="button" id="qr-back" style="display:none;font-size:13px;color:#2563eb;background:none;border:none;cursor:pointer;">← Atrás</button>
                             </div>
-                            <div id="qr-cats" class="flex flex-wrap mb-2" style="gap:8px;"></div>
-                            <p id="qr-crumb" class="text-xs text-gray-400 mb-2">Elige una categoría.</p>
-                            <div id="qr-buttons" class="flex flex-wrap" style="gap:8px;"></div>
+                            <div>
+                                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px;">Categorías</div>
+                                <div id="qr-cats" class="flex flex-wrap" style="gap:8px;"></div>
+                            </div>
+                            <div id="qr-buttons"></div>
                             <div id="qr-photos" style="display:none;" class="mt-3"></div>
                         </div>
                     @endif
@@ -179,18 +181,15 @@
         var qrCats     = document.getElementById('qr-cats');
         var qrButtons  = document.getElementById('qr-buttons');
         var qrBack     = document.getElementById('qr-back');
-        var qrCrumb    = document.getElementById('qr-crumb');
         var qrPhotos   = document.getElementById('qr-photos');
         var replyBox   = document.getElementById('reply-body');
 
         if (qrButtons) {
-            // Cascading panels shown below the always-visible category row. Each panel
-            // is one level; clicking an item drops the panels below it and (when the
-            // item drills deeper) appends the next one. cat is the active category.
-            //   {type:'products', cat}
-            //   {type:'scan',     cat, prod, filters:[{tag,value}], selected}
-            //   {type:'values',   cat, prod, filters, tag, selected}
-            var state = { cat: null, panels: [] };
+            // Three visible rows: categories (always), products (when a category is
+            // picked), and a single "detail" row for everything inside a product. The
+            // category and product rows cascade (stay visible); the detail row REPLACES
+            // its buttons as you narrow. filters/pendingTag drive that detail row.
+            var state = { cat: null, prod: null, filters: [], pendingTag: null };
 
             function pill(label, opts) {
                 opts = opts || {};
@@ -476,160 +475,157 @@
                 });
             }
 
-            // Selecting a category resets everything below it to that category's products.
             function openCategory(i) {
-                state.cat = i;
-                state.panels = [{ type: 'products', cat: i }];
+                state.cat = i; state.prod = null; state.filters = []; state.pendingTag = null;
+                render();
+            }
+            function openProduct(j) {
+                state.prod = j; state.filters = []; state.pendingTag = null;
                 render();
             }
 
-            // Clicking item `sel` in panel `k`: keep panels 0..k, mark the selection,
-            // drop everything below, and (when it drills deeper) append `child`.
-            function pickInPanel(k, sel, child) {
-                state.panels = state.panels.slice(0, k + 1);
-                state.panels[k].selected = sel;
-                if (child) state.panels.push(child);
-                render();
+            // A divided, labelled section wrapper. Returns the inner row to fill.
+            function section(title) {
+                var wrap = document.createElement('div');
+                wrap.style.cssText = 'margin-top:10px;padding-top:10px;border-top:2px solid #e5e7eb;';
+                var head = document.createElement('div');
+                head.style.cssText = 'font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px;';
+                head.textContent = title;
+                var row = document.createElement('div');
+                row.className = 'flex flex-wrap';
+                row.style.cssText = 'gap:8px;';
+                wrap.appendChild(head); wrap.appendChild(row);
+                qrButtons.appendChild(wrap);
+                return row;
             }
 
-            function newRow() {
-                var d = document.createElement('div');
-                d.className = 'flex flex-wrap';
-                d.style.cssText = 'gap:8px;margin-bottom:6px;';
-                return d;
-            }
+            // Row 2 — products of the active category (cascades; stays visible).
+            function buildProducts(row) {
+                var g = MENU[state.cat];
 
-            // Render one panel's buttons into `row`. `k` is its index in state.panels.
-            function buildPanel(panel, k, row) {
-                if (panel.type === 'products') {
-                    var g = MENU[panel.cat];
-
-                    // One cover photo per product in the category (first one found).
-                    var covers = [], pids = [];
-                    g.products.forEach(function (p) {
-                        pids.push(p.id);
-                        var u = coverImage(p);
-                        if (u) covers.push(u);
-                    });
-                    if (covers.length) {
-                        row.appendChild(pill('📷 Fotos de la categoría (' + covers.length + ')', {
-                            accent: '#fef3c7', color: '#92400e',
-                            onClick: function () {
-                                showPhotos(covers, PHOTOS_CAT_URL, pids.map(function (id) { return { name: 'product_ids[]', value: id }; }));
-                            }
-                        }));
-                    }
-
-                    g.products.forEach(function (p, j) {
-                        var active = panel.selected === j;
-                        row.appendChild(pill(p.nombre, {
-                            accent: active ? '#374151' : '#fff', color: active ? '#fff' : '#374151',
-                            onClick: function () { pickInPanel(k, j, { type: 'scan', cat: panel.cat, prod: j, filters: [] }); }
-                        }));
-                    });
-                    return;
+                var covers = [], pids = [];
+                g.products.forEach(function (p) {
+                    pids.push(p.id);
+                    var u = coverImage(p);
+                    if (u) covers.push(u);
+                });
+                if (covers.length) {
+                    row.appendChild(pill('📷 Fotos de la categoría (' + covers.length + ')', {
+                        accent: '#fef3c7', color: '#92400e',
+                        onClick: function () {
+                            showPhotos(covers, PHOTOS_CAT_URL, pids.map(function (id) { return { name: 'product_ids[]', value: id }; }));
+                        }
+                    }));
                 }
+                g.products.forEach(function (p, j) {
+                    var active = state.prod === j;
+                    row.appendChild(pill(p.nombre, {
+                        accent: active ? '#374151' : '#fff', color: active ? '#fff' : '#374151',
+                        onClick: function () { openProduct(j); }
+                    }));
+                });
+            }
 
-                if (panel.type === 'values') {
-                    var prodV = MENU[panel.cat].products[panel.prod];
-                    var varsV = inScope(prodV, panel.filters);
-                    distinctValues(varsV, panel.tag).forEach(function (val) {
-                        var active = panel.selected === val;
+            // Row 3 — everything inside the product, in ONE replacing row. Shows either
+            // the value choices for a tag being narrowed, or the current scan buttons.
+            function buildDetail(row) {
+                var prod = MENU[state.cat].products[state.prod];
+                var variants = inScope(prod, state.filters);
+
+                // Narrowing a multi-value tag: show its values (replaces the scan).
+                if (state.pendingTag) {
+                    distinctValues(variants, state.pendingTag).forEach(function (val) {
                         row.appendChild(pill(val, {
-                            accent: active ? '#5b21b6' : '#f5f3ff', color: active ? '#fff' : '#5b21b6',
-                            onClick: function () {
-                                pickInPanel(k, val, { type: 'scan', cat: panel.cat, prod: panel.prod, filters: panel.filters.concat([{ tag: panel.tag, value: val }]) });
-                            }
+                            accent: '#f5f3ff', color: '#5b21b6',
+                            onClick: function () { state.filters.push({ tag: state.pendingTag, value: val }); state.pendingTag = null; render(); }
                         }));
                     });
                     return;
                 }
 
-                // panel.type === 'scan'
-                var prod = MENU[panel.cat].products[panel.prod];
-                var variants = inScope(prod, panel.filters);
-
-                // Row of product-level tags only at the top of a product (no filters yet).
-                if (!panel.filters.length) {
+                // Product-level tags, only before any narrowing. Terminal (prefill).
+                if (!state.filters.length) {
                     prod.product_tags.forEach(function (t) {
                         row.appendChild(pill(t.label, {
                             accent: '#eef2ff', color: '#3730a3',
-                            onClick: function () { pickInPanel(k, 'pt:' + t.label); fillReply(t.text); }
+                            onClick: function () { fillReply(t.text); }
                         }));
                     });
                 }
 
                 // Scanned variant tags: one value → terminal prefill; many → drill deeper.
-                scanTags(variants, panel.filters).forEach(function (tag) {
+                scanTags(variants, state.filters).forEach(function (tag) {
                     var vals = distinctValues(variants, tag);
                     if (vals.length === 0) return;
                     if (vals.length === 1) {
                         var text = prettyLabel(tag) + ' de ' + prod.nombre + ': ' + vals[0];
                         row.appendChild(pill(prettyLabel(tag), {
-                            accent: panel.selected === ('t:' + tag) ? '#5b21b6' : '#f5f3ff',
-                            color: panel.selected === ('t:' + tag) ? '#fff' : '#5b21b6',
-                            onClick: function () { pickInPanel(k, 't:' + tag); fillReply(text); }
+                            accent: '#f5f3ff', color: '#5b21b6',
+                            onClick: function () { fillReply(text); }
                         }));
                     } else {
-                        var activeT = panel.selected === ('d:' + tag);
                         row.appendChild(pill(prettyLabel(tag) + ' ▸', {
-                            accent: activeT ? '#374151' : '#fff', color: activeT ? '#fff' : '#374151',
-                            onClick: function () {
-                                pickInPanel(k, 'd:' + tag, { type: 'values', cat: panel.cat, prod: panel.prod, filters: panel.filters, tag: tag });
-                            }
+                            onClick: function () { state.pendingTag = tag; render(); }
                         }));
                     }
                 });
 
-                // Medidas (scope-aware, terminal).
                 if (hasMedidas(variants)) {
                     var mt = medidasText(prod, variants);
                     if (mt) {
                         row.appendChild(pill('📏 Medidas', {
                             accent: '#eff6ff', color: '#1e40af',
-                            onClick: function () { pickInPanel(k, 'medidas'); fillReply(mt); }
+                            onClick: function () { fillReply(mt); }
                         }));
                     }
                 }
 
-                // Precio (scope-aware, terminal).
                 var pt = priceText(prod, variants);
                 if (pt) {
                     row.appendChild(pill('💰 Precio', {
                         accent: '#ecfdf5', color: '#065f46',
-                        onClick: function () { pickInPanel(k, 'precio'); fillReply(pt); }
+                        onClick: function () { fillReply(pt); }
                     }));
                 }
 
-                // Fotos (scope-aware).
                 var imgs = scopeImages(prod, variants);
                 if (imgs.length) {
                     row.appendChild(pill('📷 Fotos', {
                         accent: '#fef3c7', color: '#92400e',
-                        onClick: function () { pickInPanel(k, 'fotos'); showPhotos(imgs, PHOTOS_URL, [{ name: 'product_id', value: prod.id }]); }
+                        onClick: function () { showPhotos(imgs, PHOTOS_URL, [{ name: 'product_id', value: prod.id }]); }
                     }));
                 }
+            }
+
+            function detailLabel() {
+                var prod = MENU[state.cat].products[state.prod];
+                var label = prod.nombre;
+                if (state.filters.length) label += ' · ' + state.filters.map(function (f) { return f.value; }).join(' · ');
+                if (state.pendingTag) label += ' · elige ' + prettyLabel(state.pendingTag);
+                return label;
             }
 
             function render() {
                 renderCats();
                 qrButtons.innerHTML = '';
                 clearPhotos();
-                state.panels.forEach(function (panel, k) {
-                    var row = newRow();
-                    buildPanel(panel, k, row);
-                    qrButtons.appendChild(row);
-                });
-                qrBack.style.display = state.panels.length ? '' : 'none';
-                qrCrumb.textContent = state.panels.length ? '' : 'Elige una categoría.';
+
+                if (state.cat !== null) {
+                    buildProducts(section(MENU[state.cat].categoria + ' · productos'));
+                }
+                if (state.prod !== null) {
+                    buildDetail(section(detailLabel()));
+                }
+
+                qrBack.style.display = state.cat !== null ? '' : 'none';
             }
 
-            // Back collapses the deepest level (one panel at a time).
+            // Back peels one level: tag values → narrowing → product → category.
             qrBack.addEventListener('click', function () {
-                if (!state.panels.length) return;
-                state.panels.pop();
-                if (state.panels.length) delete state.panels[state.panels.length - 1].selected;
-                else state.cat = null;
+                if (state.pendingTag) { state.pendingTag = null; }
+                else if (state.filters.length) { state.filters.pop(); }
+                else if (state.prod !== null) { state.prod = null; }
+                else { state.cat = null; }
                 render();
             });
 
