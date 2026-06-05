@@ -32,10 +32,7 @@
                             <div class="mb-2">
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
                             </div>
-                            <div>
-                                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px;">Categorías</div>
-                                <div id="qr-cats" class="flex flex-wrap" style="gap:8px;"></div>
-                            </div>
+                            <div id="qr-cats" class="flex flex-wrap" style="gap:4px;border-bottom:1px solid #e5e7eb;"></div>
                             <div id="qr-buttons"></div>
                             <div id="qr-photos" style="display:none;" class="mt-3"></div>
                         </div>
@@ -193,14 +190,37 @@
                 opts = opts || {};
                 var b = document.createElement('button');
                 b.type = 'button';
-                b.textContent = label;
                 b.disabled = !!opts.disabled;
-                b.style.cssText = 'font-size:13px;padding:6px 12px;border-radius:9999px;border:1px solid #d1d5db;background:' +
+                b.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:13px;' +
+                    (opts.thumb ? 'padding:3px 12px 3px 4px;' : 'padding:6px 12px;') +
+                    'border-radius:9999px;border:1px solid #d1d5db;background:' +
                     (opts.disabled ? '#f3f4f6' : (opts.accent || '#fff')) + ';color:' +
                     (opts.disabled ? '#9ca3af' : (opts.color || '#374151')) + ';cursor:' +
                     (opts.disabled ? 'not-allowed' : 'pointer') + ';';
+                if (opts.thumb) {
+                    var img = document.createElement('img');
+                    img.src = opts.thumb;
+                    img.style.cssText = 'width:24px;height:24px;object-fit:cover;border-radius:9999px;flex:0 0 auto;border:1px solid #e5e7eb;';
+                    b.appendChild(img);
+                }
+                var span = document.createElement('span');
+                span.textContent = label;
+                b.appendChild(span);
                 if (!opts.disabled && opts.onClick) b.addEventListener('click', opts.onClick);
                 return b;
+            }
+
+            // Drop the category word from a product name ("Collar Braid Colors" under
+            // "Collares" → "Braid Colors"). Matches the leading word against the
+            // category's first word, stripping a trailing s/es so plural ≈ singular.
+            function shortName(catName, prodName) {
+                var stem = function (w) { return w.toLowerCase().replace(/(es|s)$/, ''); };
+                var catStem = stem((catName || '').trim().split(/\s+/)[0] || '');
+                var words = (prodName || '').trim().split(/\s+/);
+                if (catStem && words.length > 1 && stem(words[0]) === catStem) {
+                    return words.slice(1).join(' ');
+                }
+                return prodName;
             }
 
             function clearPhotos() { qrPhotos.style.display = 'none'; qrPhotos.innerHTML = ''; }
@@ -460,16 +480,19 @@
                 qrPhotos.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
 
-            // The category row stays visible at all times; the active one is filled in.
+            // Category row rendered as a tab strip; the active tab is underlined.
             function renderCats() {
                 qrCats.innerHTML = '';
                 MENU.forEach(function (g, i) {
                     var active = state.cat === i;
-                    qrCats.appendChild(pill(g.categoria + ' (' + g.products.length + ')', {
-                        accent: active ? '#3730a3' : '#eef2ff',
-                        color: active ? '#fff' : '#3730a3',
-                        onClick: function () { openCategory(i); }
-                    }));
+                    var t = document.createElement('button');
+                    t.type = 'button';
+                    t.textContent = g.categoria + ' (' + g.products.length + ')';
+                    t.style.cssText = 'font-size:13px;padding:6px 10px;margin-bottom:-1px;background:none;border:none;' +
+                        'border-bottom:2px solid ' + (active ? '#3730a3' : 'transparent') + ';' +
+                        'color:' + (active ? '#3730a3' : '#6b7280') + ';font-weight:' + (active ? '600' : '400') + ';cursor:pointer;';
+                    t.addEventListener('click', function () { openCategory(i); });
+                    qrCats.appendChild(t);
                 });
             }
 
@@ -517,8 +540,9 @@
                 }
                 g.products.forEach(function (p, j) {
                     var active = state.prod === j;
-                    row.appendChild(pill(p.nombre, {
+                    row.appendChild(pill(shortName(g.categoria, p.nombre), {
                         accent: active ? '#374151' : '#fff', color: active ? '#fff' : '#374151',
+                        thumb: coverImage(p),
                         onClick: function () { openProduct(j); }
                     }));
                 });
