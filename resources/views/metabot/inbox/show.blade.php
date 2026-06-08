@@ -437,23 +437,26 @@
             }
 
             function medidasText(prod, variants) {
-                var lines = [];
+                var blocks = [];
                 if (prod.pivot) {
+                    // One block per pivot value (e.g. talla), each piece on its own line.
                     var seen = {};
                     variants.forEach(function (v) {
                         var pv = v.pivot_valor;
                         if (pv === null || pv === undefined || seen[pv]) return;
                         seen[pv] = true;
                         var parts = measuresOf(v);
-                        if (parts.length) {
-                            lines.push('• ' + (prod.pivot_label || prod.pivot) + ' ' + pv + ' — ' + parts.join(', '));
-                        }
+                        if (!parts.length) return;
+                        var lines = ['*' + (prod.pivot_label || prod.pivot) + ' ' + pv + '*'];
+                        parts.forEach(function (part) { lines.push('• ' + part); });
+                        blocks.push(lines.join('\n'));
                     });
                 } else if (variants[0]) {
-                    measuresOf(variants[0]).forEach(function (part) { lines.push('• ' + part); });
+                    var single = measuresOf(variants[0]).map(function (part) { return '• ' + part; });
+                    if (single.length) blocks.push(single.join('\n'));
                 }
-                if (!lines.length) return null;
-                return '📏 Medidas de ' + prod.nombre + ':\n' + lines.join('\n');
+                if (!blocks.length) return null;
+                return '📏 Medidas de ' + prod.nombre + ':\n\n' + blocks.join('\n\n');
             }
 
             function priceText(prod, variants) {
@@ -469,12 +472,16 @@
             }
 
             function scopeImages(prod, variants) {
+                // Product-level photos win outright when present — use only those.
+                if (prod.product_images && prod.product_images.length) {
+                    return prod.product_images.slice(0, 10);
+                }
+                // No product-level photos → sweep the in-scope variants.
                 var imgs = [];
                 variants.forEach(function (v) {
                     (v.images || []).forEach(function (u) { imgs.push(u); });
                     urlsFromTags(v.tags).forEach(function (u) { imgs.push(u); });
                 });
-                if (!imgs.length) imgs = (prod.product_images || []).slice();
                 var seen = {}, out = [];
                 imgs.forEach(function (u) { if (u && !seen[u]) { seen[u] = true; out.push(u); } });
                 return out.slice(0, 10);
