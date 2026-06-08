@@ -471,7 +471,13 @@
                 return line;
             }
 
-            function scopeImages(prod, variants) {
+            function scopeImages(prod, variants, narrowed) {
+                // At product level (no narrowing): product-level photos win; only if
+                // there are none do we sweep the variants. Once narrowed to a variant,
+                // always sweep the matching in-scope variants.
+                if (!narrowed && prod.product_images && prod.product_images.length) {
+                    return prod.product_images.slice(0, 10);
+                }
                 var imgs = [];
                 variants.forEach(function (v) {
                     (v.images || []).forEach(function (u) { imgs.push(u); });
@@ -710,7 +716,7 @@
                     }));
                 }
 
-                var imgs = scopeImages(prod, variants);
+                var imgs = scopeImages(prod, variants, state.filters.length > 0);
                 if (imgs.length) {
                     row.appendChild(pill('📷 Fotos', {
                         accent: '#fef3c7', color: '#92400e',
