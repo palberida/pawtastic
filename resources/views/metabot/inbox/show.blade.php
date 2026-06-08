@@ -384,9 +384,25 @@
                 return out;
             }
 
+            // "key: value" pairs from a flat measurement object, e.g.
+            // {"cuello":"35-41 cm","largo":"46 cm"} → ["Cuello: 35-41 cm", "Largo: 46 cm"].
+            function flatMeasures(obj) {
+                var out = [];
+                Object.keys(obj).forEach(function (key) {
+                    if (obj[key] !== '' && obj[key] != null && typeof obj[key] !== 'object') {
+                        out.push(prettyLabel(key) + ': ' + obj[key]);
+                    }
+                });
+                return out;
+            }
+
             // Measurement "label: value" parts for a variant, from both medidas_*
-            // tags and any tag whose value is a JSON object (the `medidas` convention,
-            // e.g. medidas: {"cuello":"35-41 cm","largo":"46 cm"}).
+            // tags and any tag whose value is a JSON object (the `medidas` convention).
+            // Two object shapes are supported:
+            //   flat   — {"cuello":"35-41 cm","largo":"46 cm"}
+            //   nested — {"collar":{"cuello":"24-28 cm"},"arnes":{"lomo":"10 cm","pecho":"36-41 cm"}}
+            // For nested (multi-piece sets), each piece is grouped on its own part,
+            // e.g. "Arnes — Lomo: 10 cm, Pecho: 36-41 cm".
             function measuresOf(v) {
                 var parts = [];
                 Object.keys(v.tags).forEach(function (tag) {
@@ -400,11 +416,17 @@
                     if (s.charAt(0) !== '{') return;
                     try {
                         var obj = JSON.parse(s);
-                        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-                            Object.keys(obj).forEach(function (key) {
-                                if (obj[key] !== '' && obj[key] != null) parts.push(prettyLabel(key) + ': ' + obj[key]);
-                            });
-                        }
+                        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+                        Object.keys(obj).forEach(function (key) {
+                            var sub = obj[key];
+                            if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
+                                // Nested piece (collar / correa / arnes …).
+                                var inner = flatMeasures(sub);
+                                if (inner.length) parts.push(prettyLabel(key) + ' — ' + inner.join(', '));
+                            } else if (sub !== '' && sub != null) {
+                                parts.push(prettyLabel(key) + ': ' + sub);
+                            }
+                        });
                     } catch (e) { /* not JSON → ignore */ }
                 });
                 return parts;
