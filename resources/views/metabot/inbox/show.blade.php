@@ -472,16 +472,12 @@
             }
 
             function scopeImages(prod, variants) {
-                // Product-level photos win outright when present — use only those.
-                if (prod.product_images && prod.product_images.length) {
-                    return prod.product_images.slice(0, 10);
-                }
-                // No product-level photos → sweep the in-scope variants.
                 var imgs = [];
                 variants.forEach(function (v) {
                     (v.images || []).forEach(function (u) { imgs.push(u); });
                     urlsFromTags(v.tags).forEach(function (u) { imgs.push(u); });
                 });
+                if (!imgs.length) imgs = (prod.product_images || []).slice();
                 var seen = {}, out = [];
                 imgs.forEach(function (u) { if (u && !seen[u]) { seen[u] = true; out.push(u); } });
                 return out.slice(0, 10);
