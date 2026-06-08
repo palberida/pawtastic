@@ -561,12 +561,22 @@ class MetabotInboxController extends Controller
             return '';
         }
         if (!empty($row->body)) {
-            return $row->body;
+            return $this->cropPreview($row->body);
         }
         if (!empty($row->button_title)) {
-            return $row->button_title;
+            return $this->cropPreview($row->button_title);
         }
 
         return '[' . ($row->kind ?? 'evento') . ']';
+    }
+
+    // Sidebar previews show only a teaser: collapse newlines/runs of whitespace to
+    // single spaces and cap the length so a long message (e.g. medidas) can't blow
+    // out the conversation list.
+    private function cropPreview(string $text): string
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+
+        return \Illuminate\Support\Str::limit($text, 60);
     }
 }
