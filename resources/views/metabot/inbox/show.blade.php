@@ -47,25 +47,24 @@
                     {{-- Live 24h customer-service-window indicator (filled by JS). --}}
                     <div id="wa-window-banner" class="mt-3 px-3 py-2 rounded-md text-sm" style="display:none;"></div>
 
-                    {{-- Reply box + device image upload share one row. The image input is
-                         hidden behind a styled label (so we control its text instead of the
-                         browser's "Choose Files") and sends as soon as files are picked. --}}
+                    {{-- Reply box with an inline 📷 that opens the device image picker. The
+                         picker lives in the hidden form below; the label targets it by id and
+                         it auto-sends on selection. --}}
                     <div class="mt-4 flex items-end" style="gap:8px;" data-wa-free>
                         <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="flex items-end" style="gap:8px;flex:1 1 auto;min-width:0;">
                             @csrf
-                            <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
+                            <div style="position:relative;flex:1 1 auto;min-width:0;">
+                                <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" style="padding-right:2.25rem;">{{ old('body') }}</textarea>
+                                <label for="images" title="Enviar imágenes" style="position:absolute;right:8px;bottom:8px;cursor:pointer;font-size:18px;line-height:1;">📷</label>
+                            </div>
                             <button type="submit" id="reply-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" style="flex:none;">Enviar</button>
                         </form>
-                        <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" id="image-form" style="flex:none;">
-                            @csrf
-                            <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required
-                                   onchange="if(this.files.length){this.form.submit();}"
-                                   class="sr-only">
-                            <label for="images" class="inline-flex items-center cursor-pointer bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition text-sm font-medium" style="gap:6px;white-space:nowrap;">
-                                📷 Enviar imágenes
-                            </label>
-                        </form>
                     </div>
+                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" id="image-form" class="hidden">
+                        @csrf
+                        <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required
+                               onchange="if(this.files.length){this.form.submit();}">
+                    </form>
 
                     @if($templates->isNotEmpty())
                         <div class="mt-6 pt-4 border-t border-gray-200" id="wa-template" style="display:none;">
