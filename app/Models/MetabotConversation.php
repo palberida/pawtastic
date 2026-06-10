@@ -17,10 +17,12 @@ class MetabotConversation extends Model
         'current_source_id',
         'status',
         'last_message_at',
+        'last_read_at',
     ];
 
     protected $casts = [
         'last_message_at' => 'datetime',
+        'last_read_at'    => 'datetime',
     ];
 
     public function ad()

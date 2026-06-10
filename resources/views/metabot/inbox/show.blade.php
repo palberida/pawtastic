@@ -40,6 +40,12 @@
                     @if(!$phone)
                         <p class="text-gray-400 py-10 text-center">Aún no hay conversaciones.</p>
                     @else
+                    <div class="flex justify-end mb-2">
+                        <form method="POST" action="{{ route('metabot.inbox.markunread', ['phone' => $phone]) }}">
+                            @csrf
+                            <button type="submit" class="text-xs text-blue-600 hover:underline">Marcar como no leído</button>
+                        </form>
+                    </div>
                     <div id="thread" class="overflow-y-auto border border-gray-100 rounded-md p-3 bg-gray-50" style="max-height:28.8rem;">
                         @include('metabot.inbox._thread')
                     </div>

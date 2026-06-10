@@ -58,9 +58,10 @@ class MetabotInboxController extends Controller
             ->pluck('from_phone');
 
         $statuses = MetabotConversation::pluck('status', 'phone');
+        $reads    = MetabotConversation::pluck('last_read_at', 'phone');
         $names    = DB::table('metabot_contacts')->pluck('name', 'phone');
 
-        return $phones->map(function ($phone) use ($statuses, $names) {
+        return $phones->map(function ($phone) use ($statuses, $reads, $names) {
             $last = DB::table('metabot_events')
                 ->where(function ($q) use ($phone) {
                     $q->where('from_phone', $phone)->orWhere('to_phone', $phone);
@@ -69,15 +70,22 @@ class MetabotInboxController extends Controller
                 ->orderByDesc('id')
                 ->first();
 
-            // Pending = the customer's last message has no customer-facing reply after it.
-            $lastInboundId = DB::table('metabot_events')
+            // Pending (unread) = the customer's last message is BOTH unanswered (no
+            // customer-facing reply after it) AND unseen since the staff last opened
+            // the chat (last_read_at). Opening a chat sets last_read_at, so it clears
+            // even without a reply; a newer inbound or "mark as unread" re-flags it.
+            $lastInbound = DB::table('metabot_events')
                 ->where('from_phone', $phone)->where('direction', 'in')
-                ->max('id');
+                ->orderByDesc('id')
+                ->first(['id', 'created_at']);
             $lastReplyId = DB::table('metabot_events')
                 ->where('to_phone', $phone)->where('direction', 'out')
                 ->whereIn('kind', self::CUSTOMER_FACING)
                 ->max('id');
-            $pending = $lastInboundId && (!$lastReplyId || $lastInboundId > $lastReplyId);
+            $readAt     = $reads[$phone] ?? null;
+            $unanswered = $lastInbound && (!$lastReplyId || $lastInbound->id > $lastReplyId);
+            $unseen     = $lastInbound && (!$readAt || $lastInbound->created_at > $readAt);
+            $pending    = $unanswered && $unseen;
 
             return (object) [
                 'phone'          => $phone,
@@ -98,8 +106,14 @@ class MetabotInboxController extends Controller
         })->values();
     }
 
-    public function show($phone)
+    public function show(Request $request, $phone)
     {
+        // Opening a chat marks it read — unless we just came back from "mark as
+        // unread" (?unread=1), which would otherwise immediately re-read it.
+        if (!$request->boolean('unread')) {
+            $this->touchRead($phone);
+        }
+
         $messages      = $this->threadFor($phone);
         $templates     = MetabotTemplate::where('status', 'active')->orderBy('label')->orderBy('name')->get();
         $name          = DB::table('metabot_contacts')->where('phone', $phone)->value('name');
@@ -107,6 +121,26 @@ class MetabotInboxController extends Controller
         $conversations = $this->conversationList(); // left sidebar to hop between chats
 
         return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu', 'conversations'));
+    }
+
+    // Mark a chat read (it's been opened). Preserves any existing conversation state.
+    private function touchRead($phone): void
+    {
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->last_read_at = now();
+        $conv->save();
+    }
+
+    // Re-flag a chat as unread (opened by accident). Nulling last_read_at makes it
+    // pending again; the ?unread=1 redirect keeps show() from re-reading it on land.
+    public function markUnread($phone)
+    {
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->last_read_at = null;
+        $conv->save();
+
+        return redirect()->route('metabot.inbox.show', ['phone' => $phone, 'unread' => 1])
+            ->with('success', 'Conversación marcada como no leída.');
     }
 
     /**

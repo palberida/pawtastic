@@ -375,6 +375,7 @@ CREATE TABLE metabot_conversations (
     current_source_id VARCHAR(128) NULL,
     status            ENUM('active','handed_off') NOT NULL DEFAULT 'active',
     last_message_at   TIMESTAMP NULL,
+    last_read_at      TIMESTAMP NULL,                         -- staff opened the inbox chat (read receipt); NULL = unread
     created_at        TIMESTAMP NULL,
     updated_at        TIMESTAMP NULL,
     PRIMARY KEY (id),
