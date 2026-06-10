@@ -13,14 +13,6 @@ use Illuminate\Support\Facades\Log;
 
 class MetabotInboxController extends Controller
 {
-    // Outbound kinds the customer actually receives. An internal row like
-    // bot_escalate is NOT here: when the bot hands off, the customer got nothing,
-    // so the chat must still read as pending a human reply.
-    private const CUSTOMER_FACING = [
-        'bot_text', 'bot_list', 'bot_image', 'bot_faq',
-        'human_reply', 'human_image', 'template', 'sent_buttons',
-    ];
-
     // "Bandeja" entry point. The standalone list page is gone — the chat page now
     // carries the conversation list in its sidebar — so this just opens the chat on
     // the top conversation (pending/newest first). Empty inbox renders the shell.
@@ -58,7 +50,9 @@ class MetabotInboxController extends Controller
             ->pluck('from_phone');
 
         $statuses = MetabotConversation::pluck('status', 'phone');
-        $reads    = MetabotConversation::pluck('last_read_at', 'phone');
+        // Raw strings (not the model, whose datetime cast would yield Carbon) so we
+        // can string-compare against metabot_events.created_at directly.
+        $reads    = DB::table('metabot_conversations')->pluck('last_read_at', 'phone');
         $names    = DB::table('metabot_contacts')->pluck('name', 'phone');
 
         return $phones->map(function ($phone) use ($statuses, $reads, $names) {
@@ -70,22 +64,15 @@ class MetabotInboxController extends Controller
                 ->orderByDesc('id')
                 ->first();
 
-            // Pending (unread) = the customer's last message is BOTH unanswered (no
-            // customer-facing reply after it) AND unseen since the staff last opened
-            // the chat (last_read_at). Opening a chat sets last_read_at, so it clears
-            // even without a reply; a newer inbound or "mark as unread" re-flags it.
+            // Pending (unread) = the customer's last message is newer than the last
+            // time staff opened the chat (last_read_at). Opening sets last_read_at so
+            // it clears even without a reply; a newer inbound or "mark as unread"
+            // (which nulls last_read_at) re-flags it.
             $lastInbound = DB::table('metabot_events')
                 ->where('from_phone', $phone)->where('direction', 'in')
-                ->orderByDesc('id')
-                ->first(['id', 'created_at']);
-            $lastReplyId = DB::table('metabot_events')
-                ->where('to_phone', $phone)->where('direction', 'out')
-                ->whereIn('kind', self::CUSTOMER_FACING)
-                ->max('id');
-            $readAt     = $reads[$phone] ?? null;
-            $unanswered = $lastInbound && (!$lastReplyId || $lastInbound->id > $lastReplyId);
-            $unseen     = $lastInbound && (!$readAt || $lastInbound->created_at > $readAt);
-            $pending    = $unanswered && $unseen;
+                ->max('created_at');
+            $readAt  = $reads[$phone] ?? null;
+            $pending = $lastInbound && (!$readAt || $lastInbound > $readAt);
 
             return (object) [
                 'phone'          => $phone,
@@ -97,11 +84,7 @@ class MetabotInboxController extends Controller
                 'pending'        => (bool) $pending,
             ];
         })->sort(function ($a, $b) {
-            // Pending first, then newest activity. Explicit comparator so ordering is
-            // stable on PHP 7.4 (where sort() isn't guaranteed stable).
-            if ($a->pending !== $b->pending) {
-                return $a->pending ? -1 : 1;
-            }
+            // Strictly newest activity first — no pending-priority reordering.
             return strcmp((string) $b->last_at, (string) $a->last_at);
         })->values();
     }
