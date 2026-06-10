@@ -23,7 +23,7 @@
             #chat-layout { display:flex; gap:1rem; align-items:stretch; }
             #chat-sidebar { display:block; flex:0 0 17rem; align-self:stretch; }
             #chat-main { flex:1 1 auto; min-width:0; max-width:none; }
-            #chat-aside { flex:0 0 25rem; align-self:flex-start; margin-top:0; }
+            #chat-aside { flex:0 0 27.5rem; align-self:flex-start; margin-top:0; }
         }
     </style>
 
@@ -87,18 +87,7 @@
 
                 {{-- Right column: quick replies + photos + device upload --}}
                 <aside id="chat-aside">
-                    @if(!empty($quickMenu))
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
-                            <div class="mb-2">
-                                <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
-                            </div>
-                            <div id="qr-cats" class="flex flex-wrap" style="gap:4px;border-bottom:1px solid #e5e7eb;"></div>
-                            <div id="qr-buttons"></div>
-                            <div id="qr-photos" style="display:none;" class="mt-3"></div>
-                        </div>
-                    @endif
-
-                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mt-4" data-wa-free>
+                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
                         @csrf
                         <label for="images" class="block text-sm font-medium text-gray-700">Enviar imágenes</label>
                         <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="mt-1 block w-full text-sm text-gray-600">
@@ -108,6 +97,17 @@
                             <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
                         </div>
                     </form>
+
+                    @if(!empty($quickMenu))
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mt-4" data-wa-free>
+                            <div class="mb-2">
+                                <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
+                            </div>
+                            <div id="qr-cats" class="flex flex-wrap" style="gap:4px;border-bottom:1px solid #e5e7eb;"></div>
+                            <div id="qr-buttons"></div>
+                            <div id="qr-photos" style="display:none;" class="mt-3"></div>
+                        </div>
+                    @endif
                 </aside>
             </div>{{-- /#chat-layout --}}
         </div>
