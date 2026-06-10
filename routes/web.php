@@ -155,6 +155,8 @@ Route::middleware(['role:ceo,administrador,vendedor'])->group(function () {
     Route::get('/metabot/inbox/{phone}',          [MetabotInboxController::class, 'show'])->name('metabot.inbox.show');
     Route::get('/metabot/inbox/{phone}/messages', [MetabotInboxController::class, 'messages'])->name('metabot.inbox.messages');
     Route::post('/metabot/inbox/{phone}/unread',   [MetabotInboxController::class, 'markUnread'])->name('metabot.inbox.markunread');
+    Route::post('/metabot/inbox/{phone}/block',    [MetabotInboxController::class, 'block'])->name('metabot.inbox.block');
+    Route::post('/metabot/inbox/{phone}/unblock',  [MetabotInboxController::class, 'unblock'])->name('metabot.inbox.unblock');
     Route::post('/metabot/inbox/{phone}/reply',    [MetabotInboxController::class, 'reply'])->name('metabot.inbox.reply');
     Route::post('/metabot/inbox/{phone}/template', [MetabotInboxController::class, 'sendTemplate'])->name('metabot.inbox.template');
     Route::post('/metabot/inbox/{phone}/image',    [MetabotInboxController::class, 'sendImage'])->name('metabot.inbox.image');

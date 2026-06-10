@@ -37,7 +37,9 @@
                     @if($c->last_direction === 'out')<span style="color:#6b7280;font-weight:600;">Tú: </span>@endif{{ $c->last_body }}
                 </div>
             </div>
-            @if($c->status === 'handed_off')
+            @if($c->blocked ?? false)
+                <span title="Cliente bloqueado" style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:9999px;background:#fee2e2;color:#991b1b;white-space:nowrap;flex:none;">🚫 Bloq</span>
+            @elseif($c->status === 'handed_off')
                 <span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:9999px;background:#fef3c7;color:#b45309;white-space:nowrap;flex:none;">Esc</span>
             @endif
         </a>

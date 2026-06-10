@@ -182,6 +182,12 @@ class WhatsAppWebhookController extends Controller
 
         $conv = MetabotConversation::where('phone', $from)->first();
 
+        // Staff blocked this customer — the bot stays silent regardless of ad clicks,
+        // and we don't touch the conversation (no re-wake, no read/state changes).
+        if ($conv && $conv->blocked_at !== null) {
+            return;
+        }
+
         if ($ad) {
             // Engage or re-wake. A handed_off conversation returns to active here.
             $conv = MetabotConversation::firstOrNew(['phone' => $from]);

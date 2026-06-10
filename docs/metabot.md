@@ -376,6 +376,7 @@ CREATE TABLE metabot_conversations (
     status            ENUM('active','handed_off') NOT NULL DEFAULT 'active',
     last_message_at   TIMESTAMP NULL,
     last_read_at      TIMESTAMP NULL,                         -- staff opened the inbox chat (read receipt); NULL = unread
+    blocked_at        TIMESTAMP NULL,                         -- staff blocked this customer; NULL = not blocked. No sends (staff or bot) while set
     created_at        TIMESTAMP NULL,
     updated_at        TIMESTAMP NULL,
     PRIMARY KEY (id),

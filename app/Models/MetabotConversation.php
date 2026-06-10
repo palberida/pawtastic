@@ -18,11 +18,13 @@ class MetabotConversation extends Model
         'status',
         'last_message_at',
         'last_read_at',
+        'blocked_at',
     ];
 
     protected $casts = [
         'last_message_at' => 'datetime',
         'last_read_at'    => 'datetime',
+        'blocked_at'      => 'datetime',
     ];
 
     public function ad()

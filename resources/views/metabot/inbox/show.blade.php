@@ -40,16 +40,34 @@
                     @if(!$phone)
                         <p class="text-gray-400 py-10 text-center">Aún no hay conversaciones.</p>
                     @else
-                    <div class="flex justify-end mb-2">
+                    <div class="flex justify-end items-center mb-2" style="gap:14px;">
                         <form method="POST" action="{{ route('metabot.inbox.markunread', ['phone' => $phone]) }}">
                             @csrf
                             <button type="submit" class="text-xs text-blue-600 hover:underline">Marcar como no leído</button>
                         </form>
+                        @if($blocked)
+                            <form method="POST" action="{{ route('metabot.inbox.unblock', ['phone' => $phone]) }}"
+                                  onsubmit="return confirm('⚠ Este cliente está bloqueado. Al desbloquearlo podrás (y el bot podrá) volver a enviarle mensajes. ¿Desbloquear?');">
+                                @csrf
+                                <button type="submit" class="text-xs text-green-700 hover:underline">Desbloquear cliente</button>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('metabot.inbox.block', ['phone' => $phone]) }}"
+                                  onsubmit="return confirm('¿Bloquear a este cliente? No se le podrá enviar ningún mensaje (ni respuestas del bot) hasta que lo desbloquees.');">
+                                @csrf
+                                <button type="submit" class="text-xs text-red-600 hover:underline">Bloquear cliente</button>
+                            </form>
+                        @endif
                     </div>
                     <div id="thread" class="overflow-y-auto border border-gray-100 rounded-md p-3 bg-gray-50" style="max-height:28.8rem;">
                         @include('metabot.inbox._thread')
                     </div>
 
+                    @if($blocked)
+                        <div class="mt-4 px-3 py-3 rounded-md text-sm" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;">
+                            🚫 Has bloqueado a este cliente. No se le enviarán mensajes (ni respuestas del bot). Usa <strong>Desbloquear cliente</strong> arriba para reactivarlo.
+                        </div>
+                    @else
                     {{-- Live 24h customer-service-window indicator (filled by JS). --}}
                     <div id="wa-window-banner" class="mt-3 px-3 py-2 rounded-md text-sm" style="display:none;"></div>
 
@@ -90,6 +108,7 @@
                             </form>
                         </div>
                     @endif
+                    @endif{{-- /$blocked --}}
                     @endif{{-- /$phone --}}
                 </div>
             </div>
@@ -97,7 +116,7 @@
 
                 {{-- Right column: quick replies --}}
                 <aside id="chat-aside">
-                    @if(!empty($quickMenu))
+                    @if(!empty($quickMenu) && !$blocked)
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
                             <div class="mb-2">
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>

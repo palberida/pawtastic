@@ -32,6 +32,7 @@ class MetabotInboxController extends Controller
             'name'          => null,
             'quickMenu'     => [],
             'conversations' => $conversations,
+            'blocked'       => false,
         ]);
     }
 
@@ -53,9 +54,10 @@ class MetabotInboxController extends Controller
         // Raw strings (not the model, whose datetime cast would yield Carbon) so we
         // can string-compare against metabot_events.created_at directly.
         $reads    = DB::table('metabot_conversations')->pluck('last_read_at', 'phone');
+        $blocks   = DB::table('metabot_conversations')->pluck('blocked_at', 'phone');
         $names    = DB::table('metabot_contacts')->pluck('name', 'phone');
 
-        return $phones->map(function ($phone) use ($statuses, $reads, $names) {
+        return $phones->map(function ($phone) use ($statuses, $reads, $blocks, $names) {
             $last = DB::table('metabot_events')
                 ->where(function ($q) use ($phone) {
                     $q->where('from_phone', $phone)->orWhere('to_phone', $phone);
@@ -82,6 +84,7 @@ class MetabotInboxController extends Controller
                 'last_direction' => $last->direction ?? null,
                 'status'         => $statuses[$phone] ?? null,
                 'pending'        => (bool) $pending,
+                'blocked'        => !empty($blocks[$phone]),
             ];
         })->sort(function ($a, $b) {
             // Strictly newest activity first — no pending-priority reordering.
@@ -102,8 +105,9 @@ class MetabotInboxController extends Controller
         $name          = DB::table('metabot_contacts')->where('phone', $phone)->value('name');
         $quickMenu     = $this->buildQuickMenu();
         $conversations = $this->conversationList(); // left sidebar to hop between chats
+        $blocked       = $this->isBlocked($phone);
 
-        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu', 'conversations'));
+        return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu', 'conversations', 'blocked'));
     }
 
     // Mark a chat read (it's been opened). Preserves any existing conversation state.
@@ -124,6 +128,47 @@ class MetabotInboxController extends Controller
 
         return redirect()->route('metabot.inbox.show', ['phone' => $phone, 'unread' => 1])
             ->with('success', 'Conversación marcada como no leída.');
+    }
+
+    // Has staff blocked this customer? No message (staff or bot) goes out while set.
+    private function isBlocked($phone): bool
+    {
+        return MetabotConversation::where('phone', $phone)->whereNotNull('blocked_at')->exists();
+    }
+
+    // Block a problem customer: silence all outbound (the send actions below refuse,
+    // and the webhook's routeBot skips the bot). Kept separate from `status` so a new
+    // ad click can't silently unblock them.
+    public function block($phone)
+    {
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->blocked_at = now();
+        $conv->save();
+
+        return redirect()->route('metabot.inbox.show', ['phone' => $phone])
+            ->with('success', 'Cliente bloqueado. No se le enviarán mensajes.');
+    }
+
+    public function unblock($phone)
+    {
+        $conv = MetabotConversation::firstOrNew(['phone' => $phone]);
+        $conv->blocked_at = null;
+        $conv->save();
+
+        return redirect()->route('metabot.inbox.show', ['phone' => $phone])
+            ->with('success', 'Cliente desbloqueado. Ya puedes enviarle mensajes.');
+    }
+
+    // Guard for the send actions: bounce back with an error if the chat is blocked.
+    // The UI hides the send controls when blocked; this is the server-side backstop.
+    private function blockedGuard($phone)
+    {
+        if ($this->isBlocked($phone)) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $phone])
+                ->with('error', 'Cliente bloqueado. Desbloquéalo para enviarle mensajes.');
+        }
+
+        return null;
     }
 
     /**
@@ -286,6 +331,9 @@ class MetabotInboxController extends Controller
      */
     public function quickPhotos(Request $request, WhatsAppClient $whatsapp, $phone)
     {
+        if ($r = $this->blockedGuard($phone)) {
+            return $r;
+        }
         $request->validate([
             'product_id' => ['required', 'integer'],
             'images'     => ['array'],
@@ -328,6 +376,9 @@ class MetabotInboxController extends Controller
      */
     public function quickCategoryPhotos(Request $request, WhatsAppClient $whatsapp, $phone)
     {
+        if ($r = $this->blockedGuard($phone)) {
+            return $r;
+        }
         $request->validate([
             'product_ids'   => ['required', 'array'],
             'product_ids.*' => ['integer'],
@@ -439,6 +490,9 @@ class MetabotInboxController extends Controller
 
     public function reply(Request $request, WhatsAppClient $whatsapp, $phone)
     {
+        if ($r = $this->blockedGuard($phone)) {
+            return $r;
+        }
         $request->validate(['body' => ['required', 'string', 'max:4096']]);
         $text = $request->input('body');
 
@@ -478,6 +532,9 @@ class MetabotInboxController extends Controller
     // Send an approved template — the only way to reopen a chat past the 24h window.
     public function sendTemplate(Request $request, WhatsAppClient $whatsapp, $phone)
     {
+        if ($r = $this->blockedGuard($phone)) {
+            return $r;
+        }
         $request->validate(['template_id' => ['required', 'integer']]);
         $template = MetabotTemplate::where('status', 'active')->findOrFail($request->input('template_id'));
 
@@ -516,6 +573,9 @@ class MetabotInboxController extends Controller
     // customer (free-form: 24h window only). The caption (if any) rides the first.
     public function sendImage(Request $request, WhatsAppClient $whatsapp, $phone)
     {
+        if ($r = $this->blockedGuard($phone)) {
+            return $r;
+        }
         $request->validate([
             'images'   => ['required', 'array', 'min:1', 'max:10'],
             'images.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'],
