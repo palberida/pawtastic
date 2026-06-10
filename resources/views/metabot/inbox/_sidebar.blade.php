@@ -16,15 +16,19 @@
            class="flex items-center px-3 py-2 border-b border-gray-100 {{ $isActive ? '' : 'hover:bg-gray-50' }}"
            style="gap:10px;min-width:0;{{ $isActive ? 'background:#c7d2fe;border-left:6px solid #312e81;box-shadow:inset 0 0 0 1px #818cf8;' : ($c->pending ? 'background:#eff6ff;border-left:4px solid #3b82f6;' : 'border-left:4px solid transparent;') }}">
             @include('metabot.inbox._avatar', ['name' => $c->name, 'phone' => $c->phone, 'size' => 36])
+            @php($localPhone = \Illuminate\Support\Str::startsWith($c->phone, '502') ? substr($c->phone, 3) : $c->phone)
             <div style="flex:1;min-width:0;">
                 <div class="flex items-center" style="gap:6px;min-width:0;">
                     @if($c->pending && !$isActive)
                         <span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:#3b82f6;flex:none;"></span>
                     @endif
                     <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;{{ $isActive ? 'font-weight:700;color:#1e1b4b;' : ($c->pending ? 'font-weight:700;color:#111827;' : 'font-weight:600;color:#374151;') }}">
-                        {{ $c->name ?: ('+' . $c->phone) }}
+                        {{ $c->name ?: $localPhone }}
                     </span>
                 </div>
+                @if($c->name)
+                    <div class="text-xs" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9ca3af;">{{ $localPhone }}</div>
+                @endif
                 <div class="text-xs" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;{{ $c->pending ? 'color:#374151;' : 'color:#9ca3af;' }}">
                     @if($c->last_direction === 'out')<span class="text-gray-400">↩ </span>@endif{{ $c->last_body }}
                 </div>

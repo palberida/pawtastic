@@ -1,17 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight flex items-center" style="gap:10px;">
-                @if($phone)
-                    @include('metabot.inbox._avatar', ['name' => $name ?? null, 'phone' => $phone, 'size' => 32])
-                    <span>@if(!empty($name)){{ $name }} <span class="text-sm text-gray-400 font-normal">+{{ $phone }}</span>@else+{{ $phone }}@endif</span>
-                @else
-                    <span>Bandeja</span>
-                @endif
-            </h2>
-        </div>
-    </x-slot>
-
     {{-- Inline media query (not Tailwind responsive classes) so the 3-column
          layout survives even if responsive utilities aren't in the prod CSS build.
          Small screens stack: chat on top, quick replies below, bandeja hidden. --}}
@@ -30,7 +17,7 @@
         }
     </style>
 
-    <div class="py-12">
+    <div class="py-6">
         <div class="sm:px-2 lg:px-4">
             <div id="chat-layout">
                 {{-- Conversation sidebar: hop between chats without leaving --}}
@@ -66,20 +53,14 @@
                             <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
                             <button type="submit" id="reply-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" style="flex:none;">Enviar</button>
                         </div>
-                        <span class="block mt-2 text-xs text-gray-400">Solo se puede responder dentro de las 24h del último mensaje del cliente.</span>
                     </form>
 
                     {{-- Device image upload: lives under the reply box in the chat column. --}}
-                    <div class="mt-6 pt-4 border-t border-gray-200" data-wa-free>
-                        <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data">
+                    <div class="mt-3 pt-3 border-t border-gray-200" data-wa-free>
+                        <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="flex items-center" style="gap:8px;">
                             @csrf
-                            <label for="images" class="block text-sm font-medium text-gray-700">Enviar imágenes</label>
-                            <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="mt-1 block w-full text-sm text-gray-600">
-                            <input type="text" name="caption" maxlength="1024" placeholder="Descripción (opcional, va en la primera)" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <div class="mt-2 flex justify-between items-center">
-                                <span class="text-xs text-gray-400">JPG o PNG, máx 5MB c/u, hasta 10. Solo dentro de la ventana de 24h.</span>
-                                <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
-                            </div>
+                            <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="block w-full text-sm text-gray-600">
+                            <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" style="flex:none;">Enviar</button>
                         </form>
                     </div>
 
