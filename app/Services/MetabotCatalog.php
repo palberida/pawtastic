@@ -64,7 +64,18 @@ class MetabotCatalog
      */
     public function everything(): array
     {
-        $ids = $this->db()->table('products')->orderBy('descripcion')->pluck('id')->all();
+        // Only products that actually carry tags — the quick-reply console exists to
+        // paste tagged attributes, so untagged products/variants are just noise there.
+        $taggedIds = $this->db()->table('product_tags')
+            ->distinct()
+            ->pluck('id_producto')
+            ->all();
+
+        $ids = $this->db()->table('products')
+            ->whereIn('id', $taggedIds)
+            ->orderBy('descripcion')
+            ->pluck('id')
+            ->all();
 
         $groups = [];
         foreach ($this->products($ids) as $p) {
