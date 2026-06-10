@@ -47,20 +47,23 @@
                     {{-- Live 24h customer-service-window indicator (filled by JS). --}}
                     <div id="wa-window-banner" class="mt-3 px-3 py-2 rounded-md text-sm" style="display:none;"></div>
 
-                    <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="mt-4" data-wa-free>
-                        @csrf
-                        <div class="flex items-end" style="gap:8px;">
+                    {{-- Reply box + device image upload share one row. The image input is
+                         hidden behind a styled label (so we control its text instead of the
+                         browser's "Choose Files") and sends as soon as files are picked. --}}
+                    <div class="mt-4 flex items-end" style="gap:8px;" data-wa-free>
+                        <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="flex items-end" style="gap:8px;flex:1 1 auto;min-width:0;">
+                            @csrf
                             <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
                             <button type="submit" id="reply-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" style="flex:none;">Enviar</button>
-                        </div>
-                    </form>
-
-                    {{-- Device image upload: lives under the reply box in the chat column. --}}
-                    <div class="mt-3 pt-3 border-t border-gray-200" data-wa-free>
-                        <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="flex items-center" style="gap:8px;">
+                        </form>
+                        <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" id="image-form" style="flex:none;">
                             @csrf
-                            <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="block w-full text-sm text-gray-600">
-                            <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" style="flex:none;">Enviar</button>
+                            <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required
+                                   onchange="if(this.files.length){this.form.submit();}"
+                                   class="sr-only">
+                            <label for="images" class="inline-flex items-center cursor-pointer bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition text-sm font-medium" style="gap:6px;white-space:nowrap;">
+                                📷 Enviar imágenes
+                            </label>
                         </form>
                     </div>
 
