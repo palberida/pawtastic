@@ -2,10 +2,13 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight flex items-center" style="gap:10px;">
-                @include('metabot.inbox._avatar', ['name' => $name ?? null, 'phone' => $phone, 'size' => 32])
-                <span>@if(!empty($name)){{ $name }} <span class="text-sm text-gray-400 font-normal">+{{ $phone }}</span>@else+{{ $phone }}@endif</span>
+                @if($phone)
+                    @include('metabot.inbox._avatar', ['name' => $name ?? null, 'phone' => $phone, 'size' => 32])
+                    <span>@if(!empty($name)){{ $name }} <span class="text-sm text-gray-400 font-normal">+{{ $phone }}</span>@else+{{ $phone }}@endif</span>
+                @else
+                    <span>Bandeja</span>
+                @endif
             </h2>
-            <a href="{{ route('metabot.inbox.index') }}" class="text-sm text-blue-600 hover:underline">← Bandeja</a>
         </div>
     </x-slot>
 
@@ -47,6 +50,9 @@
                         <div class="mb-4 text-green-600">{{ session('success') }}</div>
                     @endif
 
+                    @if(!$phone)
+                        <p class="text-gray-400 py-10 text-center">Aún no hay conversaciones.</p>
+                    @else
                     <div id="thread" class="overflow-y-auto border border-gray-100 rounded-md p-3 bg-gray-50" style="max-height:28.8rem;">
                         @include('metabot.inbox._thread')
                     </div>
@@ -56,12 +62,26 @@
 
                     <form method="POST" action="{{ route('metabot.inbox.reply', ['phone' => $phone]) }}" class="mt-4" data-wa-free>
                         @csrf
-                        <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
-                        <div class="mt-2 flex justify-between items-center">
-                            <span class="text-xs text-gray-400">Solo se puede responder dentro de las 24h del último mensaje del cliente.</span>
-                            <button type="submit" id="reply-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
+                        <div class="flex items-end" style="gap:8px;">
+                            <textarea name="body" id="reply-body" rows="2" maxlength="4096" required placeholder="Escribe una respuesta..." class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('body') }}</textarea>
+                            <button type="submit" id="reply-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" style="flex:none;">Enviar</button>
                         </div>
+                        <span class="block mt-2 text-xs text-gray-400">Solo se puede responder dentro de las 24h del último mensaje del cliente.</span>
                     </form>
+
+                    {{-- Device image upload: lives under the reply box in the chat column. --}}
+                    <div class="mt-6 pt-4 border-t border-gray-200" data-wa-free>
+                        <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data">
+                            @csrf
+                            <label for="images" class="block text-sm font-medium text-gray-700">Enviar imágenes</label>
+                            <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="mt-1 block w-full text-sm text-gray-600">
+                            <input type="text" name="caption" maxlength="1024" placeholder="Descripción (opcional, va en la primera)" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <div class="mt-2 flex justify-between items-center">
+                                <span class="text-xs text-gray-400">JPG o PNG, máx 5MB c/u, hasta 10. Solo dentro de la ventana de 24h.</span>
+                                <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
+                            </div>
+                        </form>
+                    </div>
 
                     @if($templates->isNotEmpty())
                         <div class="mt-6 pt-4 border-t border-gray-200" id="wa-template" style="display:none;">
@@ -81,25 +101,15 @@
                             </form>
                         </div>
                     @endif
+                    @endif{{-- /$phone --}}
                 </div>
             </div>
                 </div>{{-- /chat column (#chat-main) --}}
 
-                {{-- Right column: quick replies + photos + device upload --}}
+                {{-- Right column: quick replies --}}
                 <aside id="chat-aside">
-                    <form method="POST" action="{{ route('metabot.inbox.image', ['phone' => $phone]) }}" enctype="multipart/form-data" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
-                        @csrf
-                        <label for="images" class="block text-sm font-medium text-gray-700">Enviar imágenes</label>
-                        <input type="file" name="images[]" id="images" accept="image/jpeg,image/png" multiple required class="mt-1 block w-full text-sm text-gray-600">
-                        <input type="text" name="caption" maxlength="1024" placeholder="Descripción (opcional, va en la primera)" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <div class="mt-2 flex justify-between items-center">
-                            <span class="text-xs text-gray-400">JPG o PNG, máx 5MB c/u, hasta 10. Solo dentro de la ventana de 24h.</span>
-                            <button type="submit" id="image-send" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Enviar</button>
-                        </div>
-                    </form>
-
                     @if(!empty($quickMenu))
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mt-4" data-wa-free>
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4" data-wa-free>
                             <div class="mb-2">
                                 <label class="block text-sm font-medium text-gray-700">Respuestas rápidas</label>
                             </div>
@@ -113,6 +123,7 @@
         </div>
     </div>
 
+    @if($phone)
     <script>
     (function () {
         var url    = "{{ route('metabot.inbox.messages', ['phone' => $phone]) }}";
@@ -263,8 +274,13 @@
                 b.appendChild(thumb);
                 var span = document.createElement('span');
                 span.textContent = label;
+                // Clamp to 3 lines and reserve that height so every card is the same
+                // height regardless of how long the product name is.
                 span.style.cssText = 'font-size:12px;line-height:1.15;text-align:center;word-break:break-word;color:' +
-                    (opts.active ? '#111827' : '#374151') + ';';
+                    (opts.active ? '#111827' : '#374151') + ';width:100%;' +
+                    'display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;' +
+                    'height:41.4px;';
+                span.title = label;
                 b.appendChild(span);
                 if (opts.onClick) b.addEventListener('click', opts.onClick);
                 return b;
@@ -750,4 +766,5 @@
         }
     })();
     </script>
+    @endif
 </x-app-layout>

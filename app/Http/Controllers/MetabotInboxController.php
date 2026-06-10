@@ -21,12 +21,26 @@ class MetabotInboxController extends Controller
         'human_reply', 'human_image', 'template', 'sent_buttons',
     ];
 
+    // "Bandeja" entry point. The standalone list page is gone — the chat page now
+    // carries the conversation list in its sidebar — so this just opens the chat on
+    // the top conversation (pending/newest first). Empty inbox renders the shell.
     public function index()
     {
         $conversations = $this->conversationList();
-        $pendingCount  = $conversations->where('pending', true)->count();
+        $first = $conversations->first();
 
-        return view('metabot.inbox.index', compact('conversations', 'pendingCount'));
+        if ($first) {
+            return redirect()->route('metabot.inbox.show', ['phone' => $first->phone]);
+        }
+
+        return view('metabot.inbox.show', [
+            'phone'         => null,
+            'messages'      => collect(),
+            'templates'     => collect(),
+            'name'          => null,
+            'quickMenu'     => [],
+            'conversations' => $conversations,
+        ]);
     }
 
     /**
