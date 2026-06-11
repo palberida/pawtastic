@@ -55,7 +55,7 @@ class WhatsAppClient
      * decode, or the image is already small enough, the original bytes are
      * stored unchanged so sending never breaks on a resize failure.
      */
-    public function putMediaThumbnail(string $contents, ?string $mime, int $maxWidth = 500): string
+    public function putMediaThumbnail(string $contents, ?string $mime, int $maxWidth = 300): string
     {
         return $this->putMedia($this->resizeImage($contents, $mime, $maxWidth) ?? $contents, $mime);
     }
