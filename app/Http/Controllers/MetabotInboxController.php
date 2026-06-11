@@ -433,7 +433,7 @@ class MetabotInboxController extends Controller
             try {
                 $bin = Http::timeout(15)->get($url);
                 if ($bin->successful()) {
-                    $mediaPath = $whatsapp->putMedia($bin->body(), $bin->header('Content-Type'));
+                    $mediaPath = $whatsapp->putMediaThumbnail($bin->body(), $bin->header('Content-Type'));
                 }
             } catch (\Throwable $e) {
                 Log::warning('metabot: dispatchPhotos thumbnail fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
@@ -596,7 +596,7 @@ class MetabotInboxController extends Controller
             }
 
             // Keep a local copy so the thread can show the thumbnail we sent.
-            $localPath = $whatsapp->putMedia(file_get_contents($file->getRealPath()), $file->getMimeType());
+            $localPath = $whatsapp->putMediaThumbnail(file_get_contents($file->getRealPath()), $file->getMimeType());
 
             $thisCaption = $i === 0 ? $caption : null; // caption only on the first
             $resp        = $whatsapp->sendImageById($phone, $mediaId, $thisCaption);

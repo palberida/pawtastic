@@ -48,6 +48,67 @@ class WhatsAppClient
     }
 
     /**
+     * Persist a downscaled copy of an image for the inbox preview only. The
+     * customer always receives the full-resolution file (uploaded to Meta
+     * separately), so this local copy is shrunk to cap disk usage. Resizes via
+     * GD to at most $maxWidth px wide; if GD is unavailable, the bytes don't
+     * decode, or the image is already small enough, the original bytes are
+     * stored unchanged so sending never breaks on a resize failure.
+     */
+    public function putMediaThumbnail(string $contents, ?string $mime, int $maxWidth = 500): string
+    {
+        return $this->putMedia($this->resizeImage($contents, $mime, $maxWidth) ?? $contents, $mime);
+    }
+
+    /**
+     * Resize image bytes to at most $maxWidth px wide, preserving aspect ratio
+     * and PNG transparency. Returns null (caller keeps the original) when GD is
+     * missing, the bytes can't be decoded, or the image is already narrow enough.
+     */
+    private function resizeImage(string $contents, ?string $mime, int $maxWidth): ?string
+    {
+        if (!function_exists('imagecreatefromstring')) {
+            return null;
+        }
+
+        $src = @imagecreatefromstring($contents);
+        if ($src === false) {
+            return null;
+        }
+
+        $w = imagesx($src);
+        $h = imagesy($src);
+        if ($w <= $maxWidth) {
+            imagedestroy($src);
+            return null;
+        }
+
+        $newW = $maxWidth;
+        $newH = max(1, (int) round($h * $maxWidth / $w));
+        $dst  = imagecreatetruecolor($newW, $newH);
+
+        $isPng = $mime === 'image/png';
+        if ($isPng) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+        }
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $w, $h);
+
+        ob_start();
+        if ($isPng) {
+            imagepng($dst, null, 6);
+        } else {
+            imagejpeg($dst, null, 82);
+        }
+        $out = ob_get_clean();
+
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        return $out !== '' ? $out : null;
+    }
+
+    /**
      * Send an approved template message. The only message type allowed once the
      * 24h customer-service window has closed; billed by Meta per send. Fixed-text
      * templates need no components.
