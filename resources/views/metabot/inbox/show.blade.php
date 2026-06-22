@@ -229,6 +229,23 @@
         var qrPhotos   = document.getElementById('qr-photos');
         var replyBox   = document.getElementById('reply-body');
 
+        // Enter sends the reply; Shift+Enter (or Enter mid-IME-composition) inserts a
+        // newline. requestSubmit() runs the form's native validation + submit handlers.
+        if (replyBox) {
+            replyBox.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                    e.preventDefault();
+                    var form = replyBox.form;
+                    if (!form) return;
+                    if (form.requestSubmit) {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                }
+            });
+        }
+
         if (qrButtons) {
             // Three visible rows: categories (always), products (when a category is
             // picked), and a single "detail" row for everything inside a product. The
