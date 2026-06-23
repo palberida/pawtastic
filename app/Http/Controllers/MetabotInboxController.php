@@ -553,6 +553,10 @@ class MetabotInboxController extends Controller
         if (!$ok) {
             $err = data_get($resp, 'body.error.message', 'No se pudo enviar la plantilla.');
 
+            if ($request->ajax()) {
+                return response()->json(['ok' => false, 'error' => $err], 422);
+            }
+
             return redirect()->route('metabot.inbox.show', ['phone' => $phone])->with('error', $err);
         }
 
@@ -572,6 +576,10 @@ class MetabotInboxController extends Controller
         $conv->status = 'handed_off';
         $conv->last_message_at = now();
         $conv->save();
+
+        if ($request->ajax()) {
+            return response()->json(['ok' => true]);
+        }
 
         return redirect()->route('metabot.inbox.show', ['phone' => $phone])
             ->with('success', 'Plantilla enviada. Espera la respuesta del cliente para reabrir la ventana de 24h.');

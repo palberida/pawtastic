@@ -94,7 +94,7 @@
                         <div class="mt-6 pt-4 border-t border-gray-200" id="wa-template" style="display:none;">
                             <label for="template_id" class="block text-sm font-medium text-gray-700">Reabrir conversación con una plantilla</label>
                             <p class="text-xs text-gray-400 mb-2">Úsala cuando ya pasaron 24h del último mensaje del cliente. Cada envío tiene costo (mensaje de plantilla de Meta).</p>
-                            <form method="POST" action="{{ route('metabot.inbox.template', ['phone' => $phone]) }}" onsubmit="return confirm('Se enviará una plantilla pagada para reabrir la conversación. ¿Continuar?');">
+                            <form method="POST" action="{{ route('metabot.inbox.template', ['phone' => $phone]) }}" id="template-form">
                                 @csrf
                                 <select name="template_id" id="template_id" required class="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     @foreach($templates as $t)
@@ -102,6 +102,7 @@
                                     @endforeach
                                 </select>
                                 <p id="template_preview" class="text-sm text-gray-600 mt-2 italic"></p>
+                                <p id="template_status" class="text-sm mt-2" style="display:none;"></p>
                                 <div class="mt-2 text-right">
                                     <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 transition">Enviar plantilla</button>
                                 </div>
@@ -213,6 +214,54 @@
             }
             sel.addEventListener('change', showPreview);
             showPreview();
+        }
+
+        // Send a (paid) template over AJAX. The confirm() lives here, NOT as an inline
+        // onsubmit: a submit listener fires even when an inline handler returns false, so
+        // a "Cancel" there would still let the fetch through and bill a template. Bailing
+        // inside this handler is the only way Cancel truly cancels. The 24h window stays
+        // closed after a template (only a customer reply reopens it), so we just refresh
+        // the thread via poll() and report status inline.
+        var tplForm = document.getElementById('template-form');
+        if (tplForm) {
+            var tplStatus = document.getElementById('template_status');
+            var tplBtn    = tplForm.querySelector('button[type=submit]');
+            function setTplStatus(color, text) {
+                if (!tplStatus) return;
+                tplStatus.style.display = '';
+                tplStatus.style.color = color;
+                tplStatus.textContent = text;
+            }
+            tplForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!confirm('Se enviará una plantilla pagada para reabrir la conversación. ¿Continuar?')) return;
+                if (tplBtn) tplBtn.disabled = true;
+                if (tplStatus) tplStatus.style.display = 'none';
+                fetch(tplForm.action, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    body: new FormData(tplForm)
+                })
+                    .then(function (r) {
+                        return r.json().catch(function () { return {}; })
+                            .then(function (j) { return { ok: r.ok, body: j }; });
+                    })
+                    .then(function (res) {
+                        if (!res.ok || (res.body && res.body.ok === false)) {
+                            var msg = (res.body && (res.body.error || res.body.message)) || 'No se pudo enviar la plantilla.';
+                            setTplStatus('#991b1b', '⛔ ' + msg);
+                            return;
+                        }
+                        setTplStatus('#065f46', '✅ Plantilla enviada. Espera la respuesta del cliente para reabrir la ventana de 24h.');
+                        poll();
+                    })
+                    .catch(function () {
+                        setTplStatus('#991b1b', '⛔ Error de red al enviar la plantilla.');
+                    })
+                    .finally(function () {
+                        if (tplBtn) tplBtn.disabled = false;
+                    });
+            });
         }
 
         // --- Quick replies: Categorías → Productos → drill de tags (narrowing) ---
