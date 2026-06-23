@@ -246,6 +246,43 @@
             });
         }
 
+        // Send the text reply over AJAX so the page doesn't reload. Both Enter (above)
+        // and the "Enviar" button dispatch this form's submit event. On success we reuse
+        // the existing poll() to pull the freshly-sent message into the thread; on failure
+        // we surface the server error in the same 24h-window banner.
+        var replyForm = replyBox ? replyBox.form : null;
+        if (replyForm) {
+            replyForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (replyBox.value.trim() === '') return;
+                if (replySend) replySend.disabled = true;
+                fetch(replyForm.action, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    body: new FormData(replyForm)
+                })
+                    .then(function (r) {
+                        return r.json().catch(function () { return {}; })
+                            .then(function (j) { return { ok: r.ok, body: j }; });
+                    })
+                    .then(function (res) {
+                        if (!res.ok || (res.body && res.body.ok === false)) {
+                            var msg = (res.body && (res.body.error || res.body.message)) || 'No se pudo enviar el mensaje.';
+                            setBanner('#fee2e2', '#991b1b', '⛔ ' + msg);
+                            return;
+                        }
+                        replyBox.value = '';
+                        poll();
+                    })
+                    .catch(function () {
+                        setBanner('#fee2e2', '#991b1b', '⛔ Error de red al enviar. Intenta de nuevo.');
+                    })
+                    .finally(function () {
+                        if (replySend) replySend.disabled = false;
+                    });
+            });
+        }
+
         if (qrButtons) {
             // Three visible rows: categories (always), products (when a category is
             // picked), and a single "detail" row for everything inside a product. The
