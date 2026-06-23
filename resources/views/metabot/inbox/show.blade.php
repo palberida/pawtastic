@@ -145,6 +145,27 @@
                 .catch(function () {});
         }
 
+        // Refresh the left conversation list independently of the open thread, so a
+        // message from a DIFFERENT number bumps/reorders the sidebar without a reload.
+        // Slower cadence than the thread (10s vs 7s) since it's less time-critical. We
+        // re-render the whole partial into #chat-sidebar-card and restore the list's
+        // scroll position so the swap doesn't jump.
+        var sidebarUrl  = "{{ route('metabot.inbox.sidebar', ['phone' => $phone]) }}";
+        var sidebarCard = document.getElementById('chat-sidebar-card');
+        function pollSidebar() {
+            if (!sidebarCard) return;
+            fetch(sidebarUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    var listEl = document.getElementById('chat-sidebar-list');
+                    var keepScroll = listEl ? listEl.scrollTop : 0;
+                    sidebarCard.innerHTML = html;
+                    var newList = document.getElementById('chat-sidebar-list');
+                    if (newList) newList.scrollTop = keepScroll;
+                })
+                .catch(function () {});
+        }
+
         // --- 24h customer-service window ---
         // WhatsApp only delivers free-form messages within 24h of the customer's
         // last inbound. WA.open gates the free-form send controls; templates are the
@@ -203,6 +224,7 @@
         scrollBottom();
         updateWindow();
         setInterval(poll, 7000);
+        setInterval(pollSidebar, 10000); // refresh the conversation list (other numbers)
         setInterval(updateWindow, 30000); // tick the countdown / flip to closed at expiry
 
         var sel = document.getElementById('template_id');
@@ -304,11 +326,19 @@
             replyForm.addEventListener('submit', function (e) {
                 e.preventDefault();
                 if (replyBox.value.trim() === '') return;
+                // Snapshot the text and the form fields, then clear the box right away so
+                // the user starts typing the next message in an empty box. The fetch is
+                // async; clearing only after it resolves would wipe anything typed in the
+                // meantime. On failure we restore the text (only if the box is still empty,
+                // so we don't clobber a new message the user already started).
+                var sentText = replyBox.value;
+                var fd = new FormData(replyForm);
+                replyBox.value = '';
                 if (replySend) replySend.disabled = true;
                 fetch(replyForm.action, {
                     method: 'POST',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                    body: new FormData(replyForm)
+                    body: fd
                 })
                     .then(function (r) {
                         return r.json().catch(function () { return {}; })
@@ -318,13 +348,14 @@
                         if (!res.ok || (res.body && res.body.ok === false)) {
                             var msg = (res.body && (res.body.error || res.body.message)) || 'No se pudo enviar el mensaje.';
                             setBanner('#fee2e2', '#991b1b', '⛔ ' + msg);
+                            if (replyBox.value === '') replyBox.value = sentText;
                             return;
                         }
-                        replyBox.value = '';
                         poll();
                     })
                     .catch(function () {
                         setBanner('#fee2e2', '#991b1b', '⛔ Error de red al enviar. Intenta de nuevo.');
+                        if (replyBox.value === '') replyBox.value = sentText;
                     })
                     .finally(function () {
                         if (replySend) replySend.disabled = false;

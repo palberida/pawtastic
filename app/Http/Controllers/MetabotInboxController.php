@@ -488,6 +488,15 @@ class MetabotInboxController extends Controller
         return view('metabot.inbox._thread', compact('phone', 'messages'));
     }
 
+    // Re-render just the left conversation list so the inbox can refresh it (new
+    // messages from other numbers, reordering, pending counts) without a page reload.
+    public function sidebar($phone)
+    {
+        $conversations = $this->conversationList();
+
+        return view('metabot.inbox._sidebar', ['conversations' => $conversations, 'active' => $phone]);
+    }
+
     public function reply(Request $request, WhatsAppClient $whatsapp, $phone)
     {
         if ($r = $this->blockedGuard($phone)) {
