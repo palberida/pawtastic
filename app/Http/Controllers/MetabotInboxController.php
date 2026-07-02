@@ -110,6 +110,17 @@ class MetabotInboxController extends Controller
         return view('metabot.inbox.show', compact('phone', 'messages', 'templates', 'name', 'quickMenu', 'conversations', 'blocked'));
     }
 
+    /**
+     * Standalone "Pregrabados" page: the same quick-reply catalog drill as the inbox
+     * sidebar, but every button COPIES to the clipboard instead of sending/prefilling
+     * — text buttons copy their text, and each photo becomes its own copy button.
+     * Not tied to any conversation, so staff can grab content to paste anywhere.
+     */
+    public function pregrabados()
+    {
+        return view('metabot.pregrabados', ['quickMenu' => $this->buildQuickMenu()]);
+    }
+
     // Mark a chat read (it's been opened). Preserves any existing conversation state.
     private function touchRead($phone): void
     {

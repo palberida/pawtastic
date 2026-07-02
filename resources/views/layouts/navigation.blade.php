@@ -21,6 +21,11 @@
                         {{ __('Bandeja') }}
                     </x-nav-link>
                 </div>
+                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                    <x-nav-link :href="route('metabot.pregrabados')" :active="request()->routeIs('metabot.pregrabados')">
+                        {{ __('Pregrabados') }}
+                    </x-nav-link>
+                </div>
                 @endif
                 @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo'])->exists())
                 <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex items-center">
