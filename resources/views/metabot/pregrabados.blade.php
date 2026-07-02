@@ -389,17 +389,6 @@
         function buildProducts(row) {
             var g = MENU[state.cat];
 
-            // One copy button per category cover photo.
-            var covers = [];
-            g.products.forEach(function (p) { var u = coverImage(p); if (u) covers.push(u); });
-            if (covers.length) {
-                var wrapHead = document.createElement('div');
-                wrapHead.style.cssText = 'width:100%;font-size:11px;color:#9ca3af;margin-bottom:2px;';
-                wrapHead.textContent = 'Fotos de la categoría';
-                row.appendChild(wrapHead);
-                addPhotoButtons(row, covers);
-            }
-
             g.products.forEach(function (p, j) {
                 row.appendChild(productCard(shortName(g.categoria, p.nombre), {
                     active: state.prod === j,
