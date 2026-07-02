@@ -281,7 +281,7 @@ class OrderController extends Controller
             $order = Order::create($request->all());
             $nextShopifyId = Order::max('id_shopify') + 1;
             $order->update(['id_shopify' => $nextShopifyId]);
-            $total = 25;
+            $total = 30;
             foreach ($request->input('variants', []) as $variantId => $data) {
                 if (!isset($data['selected'])) continue;
 

@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hiddenInputs = document.getElementById('variant-hidden-inputs');
     const totalEl = document.getElementById('order-total');
 
-    let total = 25;
+    let total = 30;
 
     function updateTotalDisplay() {
         totalEl.textContent = total.toFixed(2);
