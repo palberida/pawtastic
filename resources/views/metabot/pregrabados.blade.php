@@ -376,14 +376,25 @@
         function openCategory(i) { state.cat = i; state.prod = null; state.filters = []; state.pendingTag = null; render(); }
         function openProduct(j) { state.prod = j; state.filters = []; state.pendingTag = null; render(); }
 
-        // Row of per-image copy buttons ("📷 Foto 1", "📷 Foto 2", …).
-        function addPhotoButtons(row, images) {
-            images.forEach(function (url, i) {
-                row.appendChild(pill('📷 Foto ' + (i + 1), {
-                    thumb: url, accent: '#fef3c7', color: '#92400e',
-                    onClick: function (btn) { copyImage(url, btn); }
-                }));
-            });
+        // A large tap-to-copy photo tile (big thumbnail so it's easy to see).
+        function photoCard(url, i) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.title = 'Copiar esta foto';
+            b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px;' +
+                'border-radius:12px;cursor:pointer;border:2px solid #fde68a;background:#fffbeb;';
+            var img = document.createElement('img');
+            img.src = url;
+            img.style.cssText = 'width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #e5e7eb;';
+            b.appendChild(img);
+            var cap = document.createElement('span');
+            cap.textContent = '📷 Foto ' + (i + 1);
+            cap.style.cssText = 'font-size:12px;color:#92400e;font-weight:600;';
+            b.appendChild(cap);
+            // Pass the caption as the flash target so the "✓ Foto copiada" feedback
+            // shows under the image without hiding the thumbnail.
+            b.addEventListener('click', function () { copyImage(url, cap); });
+            return b;
         }
 
         function buildProducts(row) {
@@ -465,9 +476,12 @@
                 }));
             }
 
-            // Each photo becomes its own copy button.
+            // Photos go in their own row BELOW the other options, as big tiles.
             var imgs = scopeImages(prod, variants, state.filters.length > 0);
-            addPhotoButtons(row, imgs);
+            if (imgs.length) {
+                var photoRow = section('Fotos (toca para copiar)');
+                imgs.forEach(function (url, i) { photoRow.appendChild(photoCard(url, i)); });
+            }
         }
 
         function detailLabel() {
