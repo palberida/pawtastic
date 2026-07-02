@@ -133,6 +133,12 @@
                             </button>
                         </x-slot>
                         <x-slot name="content">
+                            <x-dropdown-link :href="route('metabot.inbox.index')">
+                                Bandeja
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('metabot.pregrabados')">
+                                Pregrabados
+                            </x-dropdown-link>
                             <x-dropdown-link :href="route('metabot.ads.index')">
                                 Anuncios
                             </x-dropdown-link>
@@ -334,13 +340,69 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+
             @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador','vendedor'])->exists())
+            <x-responsive-nav-link :href="route('orders.index')" :active="request()->routeIs('orders.index')">
+                {{ __('Ordenes') }}
+            </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('metabot.inbox.index')" :active="request()->routeIs('metabot.inbox.*')">
                 {{ __('Bandeja') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('metabot.pregrabados')" :active="request()->routeIs('metabot.pregrabados')">
                 {{ __('Pregrabados') }}
             </x-responsive-nav-link>
+            @endif
+
+            @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo'])->exists())
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Bancos</div>
+            <x-responsive-nav-link :href="route('bank-accounts.index')">Historico Ingresos/Egresos</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('bank-accounts.create')">Cargar estado de cuenta</x-responsive-nav-link>
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Reportes</div>
+            <x-responsive-nav-link :href="route('report-product.index')">Productos</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('report-geo.index')">Lugares</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('report-inventory.index')">Inventario</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('report-inventory.history')">Historial de Inventario</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('report-ads.index')">Ads</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('report-profit.index')">Ganancias</x-responsive-nav-link>
+            @endif
+
+            @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador'])->exists())
+            <x-responsive-nav-link :href="route('transfers.index')" :active="request()->routeIs('transfers.index')">
+                {{ __('Transferencias') }}
+            </x-responsive-nav-link>
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Metabot</div>
+            <x-responsive-nav-link :href="route('metabot.ads.index')">Anuncios</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('metabot.faqs.index')">Preguntas frecuentes</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('metabot.templates.index')">Plantillas</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('metabot.tags.index')">Etiquetas (tags)</x-responsive-nav-link>
+            @endif
+
+            @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador','vendedor'])->exists())
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Terceros</div>
+            <x-responsive-nav-link :href="route('shipments.load')">Liquidaciones CAEX</x-responsive-nav-link>
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Contabilidad</div>
+            <x-responsive-nav-link :href="route('invoices', ['state' => 'pending'])">Facturación</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('invoices', ['state' => 'done'])">Facturados</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('accounting.index')">Estados de Cuenta</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('accounting.invoices_date')">Fecha Facturacion Auto</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('taxes.create')">Cargar Impuestos</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('calculator.index')" :active="request()->routeIs('calculator.index')">
+                {{ __('Calculadora') }}
+            </x-responsive-nav-link>
+            @endif
+
+            @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador','contador'])->exists())
+            <x-responsive-nav-link :href="route('expenses.index')" :active="request()->routeIs('expenses.index')">
+                {{ __('Gastos') }}
+            </x-responsive-nav-link>
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Imprevistos</div>
+            <x-responsive-nav-link :href="route('order-problems.index')">Imprevistos</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('shipments')">Ordenes Atascadas</x-responsive-nav-link>
+            @endif
+
+            @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['contador'])->exists())
+            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Reportes</div>
+            <x-responsive-nav-link :href="route('report-inventory.history')">Historial de Inventario</x-responsive-nav-link>
             @endif
         </div>
 
