@@ -319,9 +319,9 @@
                 return line;
             }
 
-            // Otherwise list each size with its own price.
+            // Otherwise list each size with its own price, cheapest first.
             var lines = [], seen = {};
-            priced.forEach(function (v) {
+            priced.slice().sort(function (a, b) { return a.precio - b.precio; }).forEach(function (v) {
                 var pv = v.pivot_valor;
                 var label = (prod.pivot && pv !== null && pv !== undefined && pv !== '')
                     ? (prod.pivot_label || prod.pivot) + ' ' + pv
