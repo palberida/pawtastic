@@ -313,7 +313,7 @@
             var min = Math.min.apply(null, prices), max = Math.max.apply(null, prices);
             var line = (min === max)
                 ? '💰 ' + prod.nombre + ': Q' + money(min)
-                : '💰 ' + prod.nombre + ': desde Q' + money(min) + ' hasta Q' + money(max);
+                : '💰 ' + prod.nombre + ': desde Q' + money(min) + ' hasta Q' + money(max) + ' dependiendo de la talla';
             if (variants.length && variants.every(function (v) { return v.agotado; })) line += ' (agotado)';
             return line;
         }
