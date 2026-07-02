@@ -334,6 +334,14 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador','vendedor'])->exists())
+            <x-responsive-nav-link :href="route('metabot.inbox.index')" :active="request()->routeIs('metabot.inbox.*')">
+                {{ __('Bandeja') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('metabot.pregrabados')" :active="request()->routeIs('metabot.pregrabados')">
+                {{ __('Pregrabados') }}
+            </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->
