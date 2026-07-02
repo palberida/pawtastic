@@ -307,15 +307,32 @@
             return '📏 Medidas de ' + prod.nombre + ':\n\n' + blocks.join('\n\n');
         }
         function priceText(prod, variants) {
-            var prices = variants.map(function (v) { return v.precio; })
-                .filter(function (x) { return x !== null && x !== undefined; });
-            if (!prices.length) return null;
+            var priced = variants.filter(function (v) { return v.precio !== null && v.precio !== undefined; });
+            if (!priced.length) return null;
+            var prices = priced.map(function (v) { return v.precio; });
             var min = Math.min.apply(null, prices), max = Math.max.apply(null, prices);
-            var line = (min === max)
-                ? '💰 ' + prod.nombre + ': Q' + money(min)
-                : '💰 ' + prod.nombre + ': desde Q' + money(min) + ' hasta Q' + money(max) + ' dependiendo de la talla';
-            if (variants.length && variants.every(function (v) { return v.agotado; })) line += ' (agotado)';
-            return line;
+
+            // Single price across every size → one clean line.
+            if (min === max) {
+                var line = '💰 ' + prod.nombre + ': Q' + money(min);
+                if (variants.length && variants.every(function (v) { return v.agotado; })) line += ' (agotado)';
+                return line;
+            }
+
+            // Otherwise list each size with its own price.
+            var lines = [], seen = {};
+            priced.forEach(function (v) {
+                var pv = v.pivot_valor;
+                var label = (prod.pivot && pv !== null && pv !== undefined && pv !== '')
+                    ? (prod.pivot_label || prod.pivot) + ' ' + pv
+                    : (v.nombre || '');
+                if (label && seen[label]) return;   // one price per size
+                if (label) seen[label] = true;
+                var l = '• ' + (label ? label + ': ' : '') + 'Q' + money(v.precio);
+                if (v.agotado) l += ' (agotado)';
+                lines.push(l);
+            });
+            return '💰 ' + prod.nombre + ':\n' + lines.join('\n');
         }
         function scopeImages(prod, variants, narrowed) {
             if (!narrowed && prod.product_images && prod.product_images.length) {
