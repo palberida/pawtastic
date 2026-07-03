@@ -285,11 +285,18 @@
         function hasMedidas(variants) {
             return variants.some(function (v) { return measuresOf(v).length > 0; });
         }
+        // Canonical clothing-size order; unknown values sort last (999).
+        function sizeRank(pv) {
+            if (pv === null || pv === undefined) return 999;
+            var s = String(pv).toUpperCase().replace(/\s+/g, '');
+            var order = { XS: 0, S: 1, M: 2, L: 3, XL: 4, XXL: 5, '2XL': 5, XXXL: 6, '3XL': 6, XXXXL: 7, '4XL': 7 };
+            return Object.prototype.hasOwnProperty.call(order, s) ? order[s] : 999;
+        }
         function medidasText(prod, variants) {
             var blocks = [];
             if (prod.pivot) {
                 var seen = {};
-                variants.forEach(function (v) {
+                variants.slice().sort(function (a, b) { return sizeRank(a.pivot_valor) - sizeRank(b.pivot_valor); }).forEach(function (v) {
                     var pv = v.pivot_valor;
                     if (pv === null || pv === undefined || seen[pv]) return;
                     seen[pv] = true;
@@ -314,14 +321,15 @@
 
             // Single price across every size → one clean line.
             if (min === max) {
-                var line = '💰 ' + prod.nombre + ': Q' + money(min);
-                if (variants.length && variants.every(function (v) { return v.agotado; })) line += ' (agotado)';
-                return line;
+                return '💰 ' + prod.nombre + ': Q' + money(min);
             }
 
-            // Otherwise list each size with its own price, cheapest first.
+            // Otherwise list each size with its own price, in canonical size order.
             var lines = [], seen = {};
-            priced.slice().sort(function (a, b) { return a.precio - b.precio; }).forEach(function (v) {
+            priced.slice().sort(function (a, b) {
+                var d = sizeRank(a.pivot_valor) - sizeRank(b.pivot_valor);
+                return d !== 0 ? d : a.precio - b.precio;
+            }).forEach(function (v) {
                 var pv = v.pivot_valor;
                 var label = (prod.pivot && pv !== null && pv !== undefined && pv !== '')
                     ? (prod.pivot_label || prod.pivot) + ' ' + pv
@@ -329,7 +337,6 @@
                 if (label && seen[label]) return;   // one price per size
                 if (label) seen[label] = true;
                 var l = '• ' + (label ? label + ': ' : '') + 'Q' + money(v.precio);
-                if (v.agotado) l += ' (agotado)';
                 lines.push(l);
             });
             return '💰 ' + prod.nombre + ':\n' + lines.join('\n');

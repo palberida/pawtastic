@@ -625,7 +625,6 @@
                 var line = (min === max)
                     ? '💰 ' + prod.nombre + ': Q' + money(min)
                     : '💰 ' + prod.nombre + ': desde Q' + money(min) + ' hasta Q' + money(max);
-                if (variants.length && variants.every(function (v) { return v.agotado; })) line += ' (agotado)';
                 return line;
             }
 
