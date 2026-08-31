@@ -15,6 +15,12 @@
                         <div class="mb-4 text-green-600">{{ session('success') }}</div>
                     @endif
                    
+                    <div class="mb-4 flex justify-end">
+                        <a href="{{ route('orders.add') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                            Agregar Orden
+                        </a>
+                    </div>
+
                     <div class="mb-4 w-full">
                         <form method="GET" action="{{ route('orders.index') }}" class="flex flex-wrap items-center gap-4 w-full">
                             <div class="flex flex-col ">
@@ -121,12 +127,6 @@
                                 </select>  
                             </div>
 
-                            <div class="flex flex-col grow">
-                                <a href="{{ route('orders.add') }}">
-                                    Agregar Orden
-                                </a>
-                            </div>
-                            
                             <div class="flex flex-col grow">
                                 <label for="search_nombre" class="block text-sm font-medium text-gray-700 mb-1">Buscar nombre, producto, guia, numero</label>    
                                 <div class="relative w-full">
