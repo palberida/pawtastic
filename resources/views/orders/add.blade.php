@@ -58,12 +58,19 @@
                         <div>
                             <label for="vendedor" class="block text-sm font-medium text-gray-700">Vendedor                         
                             </label>
-                            <select id="vendedor" name="vendedor" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
-                            @foreach(getUsersWithRole(3) as $seller)
-                                <option value="{{ $seller->seller_code }}">{{ $seller->seller_code }}</option>
-
-                                @endforeach
-                            </select>
+                            @php
+                                $sellers = getUsersWithRole(3)->map(function ($seller) {
+                                    return ['value' => $seller->seller_code, 'label' => $seller->seller_code];
+                                })->values()->all();
+                            @endphp
+                            <x-searchable-select
+                                id="vendedor"
+                                name="vendedor"
+                                :options="$sellers"
+                                :selected="$sellers[0]['value'] ?? null"
+                                placeholder="Busca un vendedor..."
+                                empty-text="Sin vendedores"
+                                required />
                         </div>
                         <div>
                             <label for="forma_pago" class="block text-sm font-medium text-gray-700">Forma de Pago</label>
@@ -93,98 +100,292 @@
 
 
 
-<h3 class="text-lg font-semibold mb-2">Productos</h3>
+@php
+    $productOptions = $products->map(function ($product) {
+        return [
+            'value' => $product->id,
+            'label' => $product->descripcion,
+            'variants' => $product->variants->map(function ($variant) {
+                return [
+                    'value' => $variant->id,
+                    'label' => $variant->descripcion,
+                    'precio' => (float) $variant->precio,
+                    'stock' => (int) $variant->stock,
+                ];
+            })->values()->all(),
+        ];
+    })->values()->all();
+@endphp
 
-<div class="flex items-center gap-3 mb-4">
-    <select id="variant-select" class="border rounded px-3 py-2 flex-1">
-        <option value="">Selecciona una variante...</option>
-        @foreach ($variants as $variant)
-            <option value="{{ $variant->id }}" data-price="{{ $variant->precio }}">
-                {{ $variant->product->descripcion }} - {{ $variant->descripcion }} (Q{{ number_format($variant->precio, 2) }})
-            </option>
-        @endforeach
-    </select>
+<h3 class="text-lg font-semibold mt-6">Productos</h3>
+{{-- Los menús desplegables usan las clases .ss-* que define el componente x-searchable-select (arriba, en Vendedor). --}}
+<style>
+    .pp-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin-top: .5rem; }
+    .pp-col-producto { flex: 3 1 16rem; }
+    .pp-col-variante { flex: 2 1 14rem; }
+    .pp-col-cantidad { flex: 0 0 6rem; }
+    .pp-col-boton { flex: 0 0 8rem; }
+    .pp-add { width: 100%; padding: .5rem 1rem; border-radius: .375rem; background: #1d4ed8; color: #fff; }
+    .pp-add:disabled { background: #9ca3af; cursor: not-allowed; }
+    .pp-meta { color: #6b7280; }
+    .pp-item { display: flex; justify-content: space-between; align-items: center; gap: .75rem; border: 1px solid #e5e7eb; border-radius: .375rem; padding: .5rem .75rem; margin-bottom: .5rem; }
+    .pp-remove { color: #ef4444; }
+    .pp-remove:hover { text-decoration: underline; }
+    .pp-empty { padding: .25rem 0; font-size: .875rem; color: #6b7280; }
+    .pp-totals { text-align: right; }
+</style>
 
-    <input type="number" id="variant-qty" min="1" value="1" class="border rounded px-2 py-2 w-24 text-center" placeholder="Cant.">
+<div
+    x-data="orderProductPicker({
+        products: {{ json_encode($productOptions, JSON_UNESCAPED_UNICODE) }},
+        envio: 30
+    })"
+    class="mb-4"
+>
+    <div class="pp-row">
+        {{-- Producto --}}
+        <div class="pp-col-producto relative" @click.outside="product.open = false; syncProductLabel()">
+            <label class="block text-sm font-medium text-gray-700">Producto</label>
+            <input
+                type="text"
+                x-ref="productSearch"
+                x-model="product.query"
+                @focus="openProducts()"
+                @click="openProducts()"
+                @keydown.arrow-down.prevent="moveProduct(1)"
+                @keydown.arrow-up.prevent="moveProduct(-1)"
+                @keydown.enter.prevent="chooseProduct(filteredProducts[product.highlight])"
+                @keydown.escape.prevent="product.open = false; syncProductLabel()"
+                placeholder="Escribe para buscar un producto..."
+                autocomplete="off"
+                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+            <ul x-show="product.open" style="display: none" class="ss-menu">
+                <template x-if="!filteredProducts.length">
+                    <li class="ss-empty">Sin resultados</li>
+                </template>
+                <template x-for="(option, i) in filteredProducts" :key="option.value">
+                    <li
+                        @click="chooseProduct(option)"
+                        @mouseenter="product.highlight = i"
+                        :class="{ 'is-active': product.highlight === i, 'is-selected': option.value == product.value }"
+                        class="ss-option"
+                    >
+                        <span x-text="option.label"></span>
+                        <span class="pp-meta shrink-0" x-text="option.variants.length + ' variantes'"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
 
-    <button type="button" id="add-variant" class="px-4 py-2 bg-blue-700  text-white rounded">
-        Agregar
-    </button>
+        {{-- Variante (se llena sola al elegir el producto) --}}
+        <div class="pp-col-variante relative" @click.outside="variant.open = false; syncVariantLabel()">
+            <label class="block text-sm font-medium text-gray-700">Variante</label>
+            <input
+                type="text"
+                x-ref="variantSearch"
+                x-model="variant.query"
+                :disabled="!product.value"
+                @focus="openVariants()"
+                @click="openVariants()"
+                @keydown.arrow-down.prevent="moveVariant(1)"
+                @keydown.arrow-up.prevent="moveVariant(-1)"
+                @keydown.enter.prevent="chooseVariant(filteredVariants[variant.highlight])"
+                @keydown.escape.prevent="variant.open = false; syncVariantLabel()"
+                :placeholder="product.value ? 'Escribe para filtrar variantes...' : 'Selecciona un producto primero'"
+                autocomplete="off"
+                class="ss-input mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+            <ul x-show="variant.open" style="display: none" class="ss-menu">
+                <template x-if="!filteredVariants.length">
+                    <li class="ss-empty">Sin resultados</li>
+                </template>
+                <template x-for="(option, i) in filteredVariants" :key="option.value">
+                    <li
+                        @click="chooseVariant(option)"
+                        @mouseenter="variant.highlight = i"
+                        :class="{ 'is-active': variant.highlight === i, 'is-selected': option.value == variant.value }"
+                        class="ss-option"
+                    >
+                        <span x-text="option.label"></span>
+                        <span class="shrink-0" :class="option.stock > 0 ? 'pp-meta' : 'text-red-500'">
+                            Q<span x-text="option.precio.toFixed(2)"></span> ·
+                            <span x-text="option.stock > 0 ? 'stock ' + option.stock : 'sin stock'"></span>
+                        </span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+
+        <div class="pp-col-cantidad">
+            <label class="block text-sm font-medium text-gray-700">Cant.</label>
+            <input type="number" x-model.number="qty" min="1" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-center">
+        </div>
+
+        <div class="pp-col-boton">
+            <button type="button" @click="addItem()" :disabled="!variant.value" class="pp-add">
+                Agregar
+            </button>
+        </div>
+    </div>
+
+    <p x-show="selectedVariant && qty > selectedVariant.stock" style="display: none" class="mt-2 text-sm text-red-600">
+        Solo hay <span x-text="selectedVariant ? selectedVariant.stock : 0"></span> en inventario de esta variante.
+    </p>
+
+    <ul class="mt-4">
+        <template x-for="item in items" :key="item.id">
+            <li class="pp-item">
+                <span>
+                    <span x-text="item.label"></span>
+                    — Cant: <span x-text="item.qty"></span>
+                    — Subtotal: Q<span x-text="(item.precio * item.qty).toFixed(2)"></span>
+                </span>
+                <button type="button" class="pp-remove" @click="removeItem(item.id)">Eliminar</button>
+            </li>
+        </template>
+        <template x-if="!items.length">
+            <li class="pp-empty">Aún no has agregado productos.</li>
+        </template>
+    </ul>
+
+    <div class="pp-totals mt-4 text-sm">
+        Productos: Q<span x-text="itemsTotal.toFixed(2)"></span> · Envío: Q<span x-text="envio.toFixed(2)"></span>
+    </div>
+    <div class="pp-totals text-lg font-semibold">
+        Total: Q<span x-text="(itemsTotal + envio).toFixed(2)"></span>
+    </div>
+
+    <template x-for="item in items" :key="'input-' + item.id">
+        <div>
+            <input type="hidden" :name="'variants[' + item.id + '][selected]'" value="1">
+            <input type="hidden" :name="'variants[' + item.id + '][quantity]'" :value="item.qty">
+        </div>
+    </template>
 </div>
 
-<ul id="variant-list" class="space-y-2"></ul>
-<div class="mt-4 text-right text-lg font-semibold">
-    Total: Q<span id="order-total">0.00</span>
-</div>
-
-
-<div id="variant-hidden-inputs"></div>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const select = document.getElementById('variant-select');
-    const qtyInput = document.getElementById('variant-qty');
-    const addBtn = document.getElementById('add-variant');
-    const list = document.getElementById('variant-list');
-    const hiddenInputs = document.getElementById('variant-hidden-inputs');
-    const totalEl = document.getElementById('order-total');
-
-    let total = 30;
-
-    function updateTotalDisplay() {
-        totalEl.textContent = total.toFixed(2);
-    }
-
-    addBtn.addEventListener('click', () => {
-        const variantId = select.value;
-        const option = select.options[select.selectedIndex];
-        const variantText = option?.text;
-        const price = parseFloat(option?.dataset.price || 0);
-        const qty = parseInt(qtyInput.value);
-
-        if (!variantId || !qty || qty < 1) {
-            return alert('Selecciona una variante y cantidad válida.');
-        }
-
-        // Prevent duplicates
-        if (document.getElementById('variant-item-' + variantId)) {
-            return alert('Esta variante ya fue agregada.');
-        }
-
-        const subtotal = price * qty;
-        total += subtotal;
-        updateTotalDisplay();
-
-        // Add to visible list
-        const li = document.createElement('li');
-        li.id = 'variant-item-' + variantId;
-        li.className = 'flex justify-between items-center border rounded px-3 py-2';
-        li.innerHTML = `
-            <span>${variantText} — Cant: ${qty} — Subtotal: Q${subtotal.toFixed(2)}</span>
-            <button type="button" class="text-red-500 hover:underline" onclick="removeVariant(${variantId}, ${subtotal})">Eliminar</button>
-        `;
-        list.appendChild(li);
-
-        // Add hidden inputs for form submission
-        const hidden = document.createElement('div');
-        hidden.id = 'hidden-variant-' + variantId;
-        hidden.innerHTML = `
-            <input type="hidden" name="variants[${variantId}][selected]" value="1">
-            <input type="hidden" name="variants[${variantId}][quantity]" value="${qty}">
-        `;
-        hiddenInputs.appendChild(hidden);
-
-        // Reset selection
-        select.value = '';
-        qtyInput.value = 1;
-    });
-
-    window.removeVariant = (id, subtotal) => {
-        document.getElementById('variant-item-' + id)?.remove();
-        document.getElementById('hidden-variant-' + id)?.remove();
-        total -= subtotal;
-        updateTotalDisplay();
+window.orderProductPicker = function ({ products = [], envio = 30 }) {
+    const matches = (label, query) => {
+        const q = query.trim().toLowerCase();
+        if (!q) return true;
+        const haystack = label.toLowerCase();
+        return q.split(/\s+/).every(term => haystack.includes(term));
     };
-});
+
+    return {
+        products,
+        envio,
+        qty: 1,
+        items: [],
+        product: { value: '', query: '', open: false, highlight: 0 },
+        variant: { value: '', query: '', open: false, highlight: 0 },
+
+        get selectedProduct() {
+            return this.products.find(p => String(p.value) === String(this.product.value)) || null;
+        },
+        get selectedVariant() {
+            if (!this.selectedProduct) return null;
+            return this.selectedProduct.variants.find(v => String(v.value) === String(this.variant.value)) || null;
+        },
+        get filteredProducts() {
+            if (this.selectedProduct && this.product.query === this.selectedProduct.label) return this.products;
+            return this.products.filter(p => matches(p.label, this.product.query));
+        },
+        get filteredVariants() {
+            const variants = this.selectedProduct ? this.selectedProduct.variants : [];
+            if (this.selectedVariant && this.variant.query === this.selectedVariant.label) return variants;
+            return variants.filter(v => matches(v.label, this.variant.query));
+        },
+        get itemsTotal() {
+            return this.items.reduce((sum, item) => sum + item.precio * item.qty, 0);
+        },
+
+        syncProductLabel() {
+            this.product.query = this.selectedProduct ? this.selectedProduct.label : '';
+        },
+        syncVariantLabel() {
+            this.variant.query = this.selectedVariant ? this.selectedVariant.label : '';
+        },
+        openProducts() {
+            this.product.open = true;
+            this.product.highlight = Math.max(0, this.filteredProducts.findIndex(p => String(p.value) === String(this.product.value)));
+            this.$nextTick(() => this.$refs.productSearch.select());
+        },
+        openVariants() {
+            if (!this.product.value) return;
+            this.variant.open = true;
+            this.variant.highlight = Math.max(0, this.filteredVariants.findIndex(v => String(v.value) === String(this.variant.value)));
+            this.$nextTick(() => this.$refs.variantSearch.select());
+        },
+        moveProduct(step) {
+            this.product.open = true;
+            const max = this.filteredProducts.length - 1;
+            if (max < 0) return;
+            this.product.highlight = Math.min(max, Math.max(0, this.product.highlight + step));
+        },
+        moveVariant(step) {
+            this.variant.open = true;
+            const max = this.filteredVariants.length - 1;
+            if (max < 0) return;
+            this.variant.highlight = Math.min(max, Math.max(0, this.variant.highlight + step));
+        },
+        chooseProduct(option) {
+            if (!option) return;
+            this.product.value = String(option.value);
+            this.product.query = option.label;
+            this.product.open = false;
+            // Las variantes se llenan solas: si hay una sola, queda seleccionada.
+            this.variant.value = '';
+            this.variant.query = '';
+            this.variant.highlight = 0;
+            // Si el producto tiene una sola variante, queda elegida de una vez.
+            if (option.variants.length === 1) {
+                this.chooseVariant(option.variants[0]);
+            }
+            // El foco abre la lista de variantes (ver openVariants).
+            this.$nextTick(() => this.$refs.variantSearch.focus());
+        },
+        chooseVariant(option) {
+            if (!option) return;
+            this.variant.value = String(option.value);
+            this.variant.query = option.label;
+            this.variant.open = false;
+        },
+        addItem() {
+            const variant = this.selectedVariant;
+            const qty = parseInt(this.qty);
+
+            if (!variant || !qty || qty < 1) {
+                return alert('Selecciona una variante y una cantidad válida.');
+            }
+            if (this.items.some(item => String(item.id) === String(variant.value))) {
+                return alert('Esta variante ya fue agregada.');
+            }
+            // El servidor rechaza la orden completa si no hay inventario, así que lo cortamos aquí.
+            if (qty > variant.stock) {
+                return alert('Solo hay ' + variant.stock + ' en inventario de esta variante.');
+            }
+
+            this.items.push({
+                id: variant.value,
+                label: this.selectedProduct.label + ' - ' + variant.label,
+                precio: variant.precio,
+                qty: qty,
+            });
+
+            this.product.value = '';
+            this.product.query = '';
+            this.variant.value = '';
+            this.variant.query = '';
+            this.qty = 1;
+            this.$nextTick(() => this.$refs.productSearch.focus());
+        },
+        removeItem(id) {
+            this.items = this.items.filter(item => String(item.id) !== String(id));
+        },
+    };
+};
 </script>
 
 

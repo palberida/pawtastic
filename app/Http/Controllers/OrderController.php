@@ -211,13 +211,13 @@ class OrderController extends Controller
     public function add(Request $request)
     {
         $search = $request->input('search');
-        $variants = Variant::with('product')
-        ->join('products', 'variants.id_producto', '=', 'products.id')
-        ->orderBy('products.descripcion')
-        ->orderBy('variants.descripcion')
-        ->select('variants.*') 
-        ->get();
-        return view('orders.add', compact( 'search', 'variants'));
+        $products = Product::has('variants')
+            ->with(['variants' => function ($query) {
+                $query->orderBy('descripcion');
+            }])
+            ->orderBy('descripcion')
+            ->get();
+        return view('orders.add', compact( 'search', 'products'));
     }
 
     public function partialEdit(Request $request, $id)
