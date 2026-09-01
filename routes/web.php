@@ -63,6 +63,7 @@ Route::middleware(['role:ceo,administrador,vendedor'])->group(function () {
     Route::get('/orders/{id}', [OrderController::class, 'show'])->name('orders.show');
     Route::get('/orders/{id}/edit', [OrderController::class, 'edit'])->name('orders.edit');
     Route::put('/orders/{id}', [OrderController::class, 'update'])->name('orders.update');
+    Route::put('/orders/{id}/cancel', [OrderController::class, 'cancelOrder'])->name('orders.cancelOrder');
     Route::delete('/orders/{id}', [OrderController::class, 'destroy'])->name('orders.destroy');
     Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
     Route::get('/orders/{id}/partial-edit', [OrderController::class, 'partialEdit'])->name('orders.partialEdit');

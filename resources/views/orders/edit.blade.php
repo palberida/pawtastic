@@ -120,11 +120,26 @@
                         
                         <div class="mt-4">
                             <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-700  text-white rounded">Guardar Cambios</button>
+                            @if ($order->estado !== 'cancelado')
+                                <button type="submit" form="cancel-order-form" onclick="return confirm('¿Seguro que deseas cancelar esta orden?')" class="inline-flex items-center justify-center px-6 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-500 transition duration-200 ease-in-out">
+                                    Cancelar Orden
+                                </button>
+                            @else
+                                <span class="inline-flex items-center justify-center px-6 py-2 bg-red-500 text-white font-semibold rounded-lg">ORDEN CANCELADA</span>
+                            @endif
                             <a href="{{ route('orders.index', ['search_nombre' => request('search'), 'search_estado' => request('search_estado') , 'search_fecha' => request('search_fecha') , 'search_type' => request('search_type')]) }}" class="inline-flex items-center justify-center px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-200 ease-in-out">
                                  Regresar
                             </a>
                         </div>
                     </form>
+
+                    @if ($order->estado !== 'cancelado')
+                        <form id="cancel-order-form" method="POST" action="{{ route('orders.cancelOrder', $order->id) }}" class="hidden">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="search" value="{{ $search }}">
+                        </form>
+                    @endif
                 </div>
             </div>
         </div>

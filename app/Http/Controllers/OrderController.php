@@ -248,6 +248,37 @@ class OrderController extends Controller
                         ->with('success', 'Order updated successfully');              
     }
 
+    public function cancelOrder(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+
+        // Already cancelled: do nothing, so stock is never returned twice.
+        if ($order->estado === 'cancelado') {
+            return redirect()->route('orders.index', ['search' => $request->input('search')])
+                            ->with('success', 'Order was already cancelled');
+        }
+
+        DB::beginTransaction();
+        try{
+            $order->estado = 'cancelado';
+            $order->save();
+
+            foreach ($order->items as $item) {
+                if (!$item->id_variante) continue;
+                Variant::where('id', $item->id_variante)->increment('stock', $item->cantidad);
+            }
+
+            DB::commit();
+        } catch (Exception $err) {
+            DB::rollBack();
+            logger('--------------------------------------------------ORDER CANCEL ERROR: ' . print_r($err, true));
+            return redirect()->back()
+                ->withErrors(['update_error' => 'An error occurred: ' . $err->getMessage()]);
+        }
+        return redirect()->route('orders.index', ['search' => $request->input('search')])
+                        ->with('success', 'Order cancelled successfully');
+    }
+
     public function save(Request $request)
     {
 
