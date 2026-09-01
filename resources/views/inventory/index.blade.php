@@ -45,50 +45,43 @@
                         </div>
                     </div>
 
-                    <form method="POST" action="{{ route('inventory.stock.update') }}">
-                        @csrf
-                        <input type="hidden" name="search" value="{{ $search }}">
-                        <input type="hidden" name="page" value="{{ $variants->currentPage() }}">
-
-                        <table class="w-full min-w-full divide-y divide-gray-200 mt-4 text-sm">
-                            <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variante</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                            </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @forelse ($variants as $variant)
-                                    <tr>
-                                        <td class="px-4 py-3">{{ $variant->product_description }}</td>
-                                        <td class="px-4 py-3">{{ $variant->variant_description }}</td>
-                                        <td class="px-4 py-3 text-gray-500">{{ $variant->codigo }}</td>
-                                        <td class="px-4 py-3">
+                    <table class="w-full min-w-full divide-y divide-gray-200 mt-4 text-sm">
+                        <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variante</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                        </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse ($variants as $variant)
+                                <tr>
+                                    <td class="px-4 py-3">{{ $variant->product_description }}</td>
+                                    <td class="px-4 py-3">{{ $variant->variant_description }}</td>
+                                    <td class="px-4 py-3 text-gray-500">{{ $variant->codigo }}</td>
+                                    <td class="px-4 py-3">
+                                        <form method="POST" action="{{ route('inventory.stock.update', $variant->id) }}" class="flex items-center gap-2">
+                                            @csrf
+                                            <input type="hidden" name="search" value="{{ $search }}">
+                                            <input type="hidden" name="page" value="{{ $variants->currentPage() }}">
                                             <input type="number" min="0" step="1"
-                                                name="stock[{{ $variant->id }}]"
+                                                name="stock"
                                                 value="{{ $variant->stock }}"
                                                 class="w-24 border rounded-md p-1 text-right sm:text-sm focus:ring-blue-500 focus:border-blue-500 {{ $variant->stock <= 0 ? 'border-red-400 text-red-600' : 'border-gray-300' }}">
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="px-4 py-6 text-gray-400">No hay variantes que coincidan con la búsqueda.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-
-                        @if ($variants->count())
-                            <div class="mt-4">
-                                <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-700 text-white rounded">
-                                    Guardar Cambios
-                                </button>
-                                <span class="ml-2 text-sm text-gray-500">Guarda solo las variantes de esta página.</span>
-                            </div>
-                        @endif
-                    </form>
+                                            <button type="submit" class="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white text-xs rounded">
+                                                Guardar
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-4 py-6 text-gray-400">No hay variantes que coincidan con la búsqueda.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
 
                     <div class="mt-4">
                         {{ $variants->appends(['search' => $search])->links() }}

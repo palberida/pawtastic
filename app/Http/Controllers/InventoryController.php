@@ -47,54 +47,48 @@ class InventoryController extends Controller
     }
 
     /**
-     * Saves the stock of every row edited on the current page in one POST.
-     * Only values that actually differ from what is stored are written.
+     * Saves the stock of a single variant — one row, one POST, so an edit is
+     * never lost by paginating or re-searching before saving.
      */
-    public function updateStock(Request $request)
+    public function updateStock(Request $request, $id)
     {
         $request->validate([
-            'stock'   => 'array',
-            'stock.*' => 'nullable|integer|min:0',
+            'stock' => 'required|integer|min:0',
         ], [
-            'stock.*.integer' => 'El stock debe ser un número entero.',
-            'stock.*.min'     => 'El stock no puede ser negativo.',
+            'stock.required' => 'El stock es obligatorio.',
+            'stock.integer'  => 'El stock debe ser un número entero.',
+            'stock.min'      => 'El stock no puede ser negativo.',
         ]);
 
-        $changed = 0;
-        DB::beginTransaction();
+        $redirect = [
+            'search' => $request->input('search'),
+            'page'   => $request->input('page'),
+        ];
+
         try{
-            foreach ($request->input('stock', []) as $variantId => $value) {
-                if ($value === null || $value === '') continue;
+            $variant  = Variant::findOrFail($id);
+            $newStock = (int) $request->input('stock');
 
-                $variant = Variant::find($variantId);
-                if (!$variant) continue;
-
-                $newStock = (int) $value;
-                if ((int) $variant->stock === $newStock) continue;
-
-                logger('INVENTORY STOCK UPDATE: variante ' . $variant->id
-                    . ' de ' . $variant->stock . ' a ' . $newStock
-                    . ' por ' . (Auth::user()->name ?? 'desconocido'));
-
-                $variant->stock = $newStock;
-                $variant->save();
-                $changed++;
+            if ((int) $variant->stock === $newStock) {
+                return redirect()->route('inventory.index', $redirect)
+                    ->with('success', 'Sin cambios en ' . $variant->descripcion . '.');
             }
-            DB::commit();
+
+            logger('INVENTORY STOCK UPDATE: variante ' . $variant->id
+                . ' de ' . $variant->stock . ' a ' . $newStock
+                . ' por ' . (Auth::user()->name ?? 'desconocido'));
+
+            $oldStock = $variant->stock;
+            $variant->stock = $newStock;
+            $variant->save();
         } catch (Exception $err) {
-            DB::rollBack();
             logger('--------------------------------------------------INVENTORY UPDATE ERROR: ' . print_r($err, true));
             return redirect()->back()
                 ->withInput()
                 ->withErrors(['update_error' => 'An error occurred: ' . $err->getMessage()]);
         }
 
-        return redirect()->route('inventory.index', [
-                'search' => $request->input('search'),
-                'page'   => $request->input('page'),
-            ])
-            ->with('success', $changed === 1
-                ? 'Se actualizó 1 variante.'
-                : 'Se actualizaron ' . $changed . ' variantes.');
+        return redirect()->route('inventory.index', $redirect)
+            ->with('success', $variant->descripcion . ': stock de ' . $oldStock . ' a ' . $newStock . '.');
     }
 }
