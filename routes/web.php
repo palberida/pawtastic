@@ -11,6 +11,7 @@ use App\Http\Controllers\ReportGeoController;
 use App\Http\Controllers\ReportInventoryController;
 use App\Http\Controllers\ReportProfitController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderProblemController;
 use App\Http\Controllers\AdController;
 use App\Http\Controllers\BankAccountsController;
@@ -104,6 +105,8 @@ Route::middleware(['role:ceo'])->group(function () {
 });
 
 Route::middleware(['role:ceo,administrador'])->group(function () {
+    Route::get('/inventario', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::post('/inventario', [InventoryController::class, 'updateStock'])->name('inventory.stock.update');
     Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
     Route::get('/transfers/new', [TransferController::class, 'new'])->name('transfers.new');
     Route::get('/transfers/new-step-2', [TransferController::class, 'newStep2'])->name('transfers.newStep2');

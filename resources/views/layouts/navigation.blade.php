@@ -28,29 +28,6 @@
                 </div>
                 @endif
                 @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo'])->exists())
-                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex items-center">
-                    <x-dropdown align="right" width="48" >
-                        <x-slot name="trigger">
-                            <button class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out">
-                                <div>Bancos</div>
-
-                                <div class="ml-1">
-                                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                            </button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <x-dropdown-link :href="route('bank-accounts.index')" >
-                                Historico Ingresos/Egresos
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('bank-accounts.create')">
-                                Cargar estado de cuenta
-                            </x-dropdown-link>
-                        </x-slot>
-                    </x-dropdown>
-                </div>
                 <!-- <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex items-center">
                     <x-dropdown align="right" width="48" >
                         <x-slot name="trigger">
@@ -115,6 +92,11 @@
                 @endif
                 @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador'])->exists())
                 <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                    <x-nav-link :href="route('inventory.index')" :active="request()->routeIs('inventory.index')">
+                        {{ __('Inventario') }}
+                    </x-nav-link>
+                </div>
+                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                     <x-nav-link :href="route('transfers.index')" :active="request()->routeIs('transfers.index')">
                         {{ __('Transferencias') }}
                     </x-nav-link>
@@ -165,31 +147,6 @@
                     <x-dropdown align="right" width="48" >
                         <x-slot name="trigger">
                             <button class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out">
-                                <div>Terceros</div>
-
-                                <div class="ml-1">
-                                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                            </button>
-                        </x-slot>
-                        <x-slot name="content">
-
-                            <x-dropdown-link :href="route('shipments.load')">
-                                Liquidaciones CAEX
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('shipments.load')">
-                                (no funciona) Liquidaciones NEONET
-                            </x-dropdown-link>
-                        </x-slot>
-                        
-                    </x-dropdown>
-                </div>
-                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex items-center">
-                    <x-dropdown align="right" width="48" >
-                        <x-slot name="trigger">
-                            <button class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out">
                                 <div>Contabilidad</div>
 
                                 <div class="ml-1">
@@ -232,29 +189,6 @@
                     <x-nav-link :href="route('expenses.index')" :active="request()->routeIs('expenses.index')">
                         {{ __('Gastos') }}
                     </x-nav-link>
-                </div>
-                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex items-center">
-                    <x-dropdown align="right" width="48" >
-                        <x-slot name="trigger">
-                            <button class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out">
-                                <div>Imprevistos</div>
-
-                                <div class="ml-1">
-                                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                            </button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <x-dropdown-link :href="route('order-problems.index')" >
-                                Imprevistos
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('shipments')">
-                                Ordenes Atascadas
-                            </x-dropdown-link>
-                        </x-slot>
-                    </x-dropdown>
                 </div>
                 
                 @endif
@@ -354,9 +288,6 @@
             @endif
 
             @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo'])->exists())
-            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Bancos</div>
-            <x-responsive-nav-link :href="route('bank-accounts.index')">Historico Ingresos/Egresos</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('bank-accounts.create')">Cargar estado de cuenta</x-responsive-nav-link>
             <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Reportes</div>
             <x-responsive-nav-link :href="route('report-product.index')">Productos</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('report-geo.index')">Lugares</x-responsive-nav-link>
@@ -367,6 +298,9 @@
             @endif
 
             @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador'])->exists())
+            <x-responsive-nav-link :href="route('inventory.index')" :active="request()->routeIs('inventory.index')">
+                {{ __('Inventario') }}
+            </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('transfers.index')" :active="request()->routeIs('transfers.index')">
                 {{ __('Transferencias') }}
             </x-responsive-nav-link>
@@ -378,8 +312,6 @@
             @endif
 
             @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['ceo', 'administrador','vendedor'])->exists())
-            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Terceros</div>
-            <x-responsive-nav-link :href="route('shipments.load')">Liquidaciones CAEX</x-responsive-nav-link>
             <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Contabilidad</div>
             <x-responsive-nav-link :href="route('invoices', ['state' => 'pending'])">Facturación</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('invoices', ['state' => 'done'])">Facturados</x-responsive-nav-link>
@@ -395,9 +327,6 @@
             <x-responsive-nav-link :href="route('expenses.index')" :active="request()->routeIs('expenses.index')">
                 {{ __('Gastos') }}
             </x-responsive-nav-link>
-            <div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Imprevistos</div>
-            <x-responsive-nav-link :href="route('order-problems.index')">Imprevistos</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('shipments')">Ordenes Atascadas</x-responsive-nav-link>
             @endif
 
             @if(Auth::user() && Auth::user()->roles()->whereIn('descripcion', ['contador'])->exists())
