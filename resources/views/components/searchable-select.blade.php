@@ -20,6 +20,8 @@
         selected: {{ json_encode($selected, JSON_UNESCAPED_UNICODE) }}
     })"
     @click.outside="close()"
+    @scroll.window="reposition()"
+    @resize.window="reposition()"
     class="relative"
 >
     <input type="hidden" name="{{ $name }}" x-model="value">
@@ -52,7 +54,7 @@
     >&times;</button>
     @endunless
 
-    <ul x-show="isOpen" style="display: none" class="ss-menu">
+    <ul x-show="isOpen" :style="menuStyle" style="display: none" class="ss-menu">
         <template x-if="!filtered.length">
             <li class="ss-empty">{{ $emptyText }}</li>
         </template>
@@ -75,7 +77,9 @@
     El picker de productos de orders/add reutiliza estas mismas clases .ss-*.
 --}}
 <style>
-    .ss-menu { position: absolute; top: 100%; left: 0; z-index: 40; width: 100%; margin-top: .25rem; max-height: 15rem; overflow-y: auto; background: #fff; border: 1px solid #d1d5db; border-radius: .375rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,.1); font-size: .875rem; }
+    /* Posición fija: el menú tiene que poder salirse del .overflow-hidden de la tarjeta.
+       top/left/width/max-height los calcula ssMenuStyle() sobre el input. */
+    .ss-menu { position: fixed; z-index: 50; overflow-y: auto; background: #fff; border: 1px solid #d1d5db; border-radius: .375rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,.1); font-size: .875rem; }
     .ss-option { display: flex; justify-content: space-between; gap: .5rem; padding: .5rem .75rem; cursor: pointer; }
     .ss-option.is-active { background: #eef2ff; }
     .ss-option.is-selected { font-weight: 600; }
@@ -85,6 +89,24 @@
     .ss-input:disabled { background: #f3f4f6; }
 </style>
 <script>
+// Calcula la posición del menú sobre el input, abriéndolo hacia arriba si no cabe abajo.
+window.ssMenuStyle = function (input) {
+    const rect = input.getBoundingClientRect();
+    const margin = 8;
+    const below = window.innerHeight - rect.bottom - margin;
+    const above = rect.top - margin;
+    const openUp = below < 200 && above > below;
+    const space = openUp ? above : below;
+
+    return {
+        left: rect.left + 'px',
+        width: rect.width + 'px',
+        maxHeight: Math.max(120, Math.min(240, space)) + 'px',
+        top: openUp ? 'auto' : (rect.bottom + 4) + 'px',
+        bottom: openUp ? (window.innerHeight - rect.top + 4) + 'px' : 'auto',
+    };
+};
+
 window.searchableSelect = function ({ options = [], selected = null }) {
     return {
         options,
@@ -92,6 +114,7 @@ window.searchableSelect = function ({ options = [], selected = null }) {
         query: '',
         isOpen: false,
         highlight: 0,
+        menuStyle: {},
         init() {
             this.syncLabel();
         },
@@ -115,17 +138,25 @@ window.searchableSelect = function ({ options = [], selected = null }) {
         open() {
             this.isOpen = true;
             this.highlight = Math.max(0, this.filtered.findIndex(o => String(o.value) === String(this.value)));
+            this.menuStyle = window.ssMenuStyle(this.$refs.search);
             this.$nextTick(() => this.$refs.search.select());
+        },
+        reposition() {
+            if (this.isOpen) this.menuStyle = window.ssMenuStyle(this.$refs.search);
         },
         close() {
             this.isOpen = false;
             this.syncLabel();
         },
         move(step) {
-            this.isOpen = true;
+            if (!this.isOpen) this.open();
             const max = this.filtered.length - 1;
             if (max < 0) return;
             this.highlight = Math.min(max, Math.max(0, this.highlight + step));
+            this.$nextTick(() => {
+                const active = this.$el.querySelector('.ss-option.is-active');
+                if (active) active.scrollIntoView({ block: 'nearest' });
+            });
         },
         choose(option) {
             if (!option) return;

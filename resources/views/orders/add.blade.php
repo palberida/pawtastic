@@ -118,7 +118,8 @@
 @endphp
 
 <h3 class="text-lg font-semibold mt-6">Productos</h3>
-{{-- Los menús desplegables usan las clases .ss-* que define el componente x-searchable-select (arriba, en Vendedor). --}}
+{{-- Los menús usan las clases .ss-* y el helper ssMenuStyle() que define el componente
+     x-searchable-select (presente en esta página, en el campo Vendedor). --}}
 <style>
     .pp-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin-top: .5rem; }
     .pp-col-producto { flex: 3 1 16rem; }
@@ -140,6 +141,8 @@
         products: {{ json_encode($productOptions, JSON_UNESCAPED_UNICODE) }},
         envio: 30
     })"
+    @scroll.window="reposition()"
+    @resize.window="reposition()"
     class="mb-4"
 >
     <div class="pp-row">
@@ -160,7 +163,7 @@
                 autocomplete="off"
                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             >
-            <ul x-show="product.open" style="display: none" class="ss-menu">
+            <ul x-ref="productMenu" x-show="product.open" :style="product.style" style="display: none" class="ss-menu">
                 <template x-if="!filteredProducts.length">
                     <li class="ss-empty">Sin resultados</li>
                 </template>
@@ -196,7 +199,7 @@
                 autocomplete="off"
                 class="ss-input mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             >
-            <ul x-show="variant.open" style="display: none" class="ss-menu">
+            <ul x-ref="variantMenu" x-show="variant.open" :style="variant.style" style="display: none" class="ss-menu">
                 <template x-if="!filteredVariants.length">
                     <li class="ss-empty">Sin resultados</li>
                 </template>
@@ -278,8 +281,8 @@ window.orderProductPicker = function ({ products = [], envio = 30 }) {
         envio,
         qty: 1,
         items: [],
-        product: { value: '', query: '', open: false, highlight: 0 },
-        variant: { value: '', query: '', open: false, highlight: 0 },
+        product: { value: '', query: '', open: false, highlight: 0, style: {} },
+        variant: { value: '', query: '', open: false, highlight: 0, style: {} },
 
         get selectedProduct() {
             return this.products.find(p => String(p.value) === String(this.product.value)) || null;
@@ -310,25 +313,40 @@ window.orderProductPicker = function ({ products = [], envio = 30 }) {
         openProducts() {
             this.product.open = true;
             this.product.highlight = Math.max(0, this.filteredProducts.findIndex(p => String(p.value) === String(this.product.value)));
+            this.product.style = window.ssMenuStyle(this.$refs.productSearch);
             this.$nextTick(() => this.$refs.productSearch.select());
         },
         openVariants() {
             if (!this.product.value) return;
             this.variant.open = true;
             this.variant.highlight = Math.max(0, this.filteredVariants.findIndex(v => String(v.value) === String(this.variant.value)));
+            this.variant.style = window.ssMenuStyle(this.$refs.variantSearch);
             this.$nextTick(() => this.$refs.variantSearch.select());
         },
+        // Los menús son position:fixed, así que hay que recolocarlos al hacer scroll.
+        reposition() {
+            if (this.product.open) this.product.style = window.ssMenuStyle(this.$refs.productSearch);
+            if (this.variant.open) this.variant.style = window.ssMenuStyle(this.$refs.variantSearch);
+        },
         moveProduct(step) {
-            this.product.open = true;
+            if (!this.product.open) this.openProducts();
             const max = this.filteredProducts.length - 1;
             if (max < 0) return;
             this.product.highlight = Math.min(max, Math.max(0, this.product.highlight + step));
+            this.scrollIntoView('productMenu');
         },
         moveVariant(step) {
-            this.variant.open = true;
+            if (!this.variant.open) this.openVariants();
             const max = this.filteredVariants.length - 1;
             if (max < 0) return;
             this.variant.highlight = Math.min(max, Math.max(0, this.variant.highlight + step));
+            this.scrollIntoView('variantMenu');
+        },
+        scrollIntoView(menuRef) {
+            this.$nextTick(() => {
+                const active = this.$refs[menuRef].querySelector('.ss-option.is-active');
+                if (active) active.scrollIntoView({ block: 'nearest' });
+            });
         },
         chooseProduct(option) {
             if (!option) return;
